@@ -25,6 +25,7 @@ bot = Bot(
 async def on_ready():
     print(f">>> Logged into {bot.user}")
     print("-------------------")
+    # Syncs to test server
     await bot.tree.sync(guild = discord.Object(id = 715252385269678241))
     await bot.change_presence(activity = discord.Game('Bot Online: !help to start'))
 
