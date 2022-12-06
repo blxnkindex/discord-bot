@@ -1,4 +1,3 @@
-
 import os
 import sys
 import asyncio
@@ -6,7 +5,7 @@ from dotenv import load_dotenv
 
 import discord
 from discord.ext import commands
-from discord.ext.commands import Bot
+from discord.ext.commands import Bot, Context
 
 if not os.path.isfile('.env'):
     sys.exit('.env file not found')
@@ -18,7 +17,7 @@ else:
 intents = discord.Intents.all()
 
 bot = Bot(
-    command_prefix = commands.when_mentioned_or('!'), 
+    command_prefix = commands.when_mentioned_or('>'), 
     intents = intents, help_command = None
 )
 
@@ -26,13 +25,20 @@ bot = Bot(
 async def on_ready():
     print(f">>> Logged into {bot.user}")
     print("-------------------")
-    await bot.change_presence(activity = discord.Game('Misaka Bot Beta: !help to start'))
+    await bot.tree.sync(guild = discord.Object(id = 715252385269678241))
+    await bot.change_presence(activity = discord.Game('Bot Online: !help to start'))
+
 
 @bot.event
 async def on_message(message):
     if message.author == bot.user or message.author.bot:
         return
     await bot.process_commands(message)
+
+@bot.event
+async def on_command_error(ctx: Context, error):
+    await ctx.reply(error, ephemeral = True)
+
 
 async def load_extensions():
     for file in os.listdir('./'):
