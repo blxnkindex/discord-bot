@@ -6,3 +6,5 @@
 
 <p>- Fix intents and permissions (currently administrator)</p>
 <p>- Add code comments and attribute sources</p>
+<p>- Smooth out bot command usage</p>
+<p>- Add more cogs</p>
