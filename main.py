@@ -1,10 +1,11 @@
 import os
 import sys
 import asyncio
+import random
 from dotenv import load_dotenv
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.ext.commands import Bot, Context
 
 if not os.path.isfile('.env'):
@@ -26,8 +27,9 @@ async def on_ready():
     print(f">>> Logged into {bot.user}")
     print("-------------------")
     # Syncs to test server
-    await bot.tree.sync(guild = discord.Object(id = 715252385269678241))
-    await bot.change_presence(activity = discord.Game('Bot Online: !help to start'))
+    await bot.tree.sync(guild = discord.Object(id = int(os.getenv('MAIN_SERVER'))))
+    await bot.change_presence(activity = discord.Game('Music and music queue now working \'/play\''))
+    # presence_randomiser.start()
 
 
 @bot.event
@@ -40,6 +42,11 @@ async def on_message(message):
 async def on_command_error(ctx: Context, error):
     await ctx.reply(error, ephemeral = True)
 
+@tasks.loop(minutes=.5)
+async def presence_randomiser():
+    status = ['manifesting gunblade\'s return', 'buffing camille (she\'s weak)', 'watching walking dead', 'getting unlucky',
+    'picking ziggs (20th game straight)', 'making music queue', 'changing profile pictures', 'complaining about twitch ult', 'complaining about katarina damage']
+    await bot.change_presence(activity=discord.Game(name = random.choice(status)))
 
 async def load_extensions():
     for file in os.listdir('./'):
