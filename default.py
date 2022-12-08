@@ -1,4 +1,5 @@
 import discord
+import os
 from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
@@ -8,7 +9,7 @@ import random
 
 
 
-class Test(commands.Cog, name = 'test'):
+class Default(commands.Cog, name = 'default'):
     def __init__(self, bot):
         self.bot = bot
 
@@ -16,7 +17,7 @@ class Test(commands.Cog, name = 'test'):
         name = 'test',
         description = 'TESTING'
     )
-    @app_commands.guilds(discord.Object(id = 715252385269678241))
+    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     @commands.has_permissions(administrator = True)
     async def test(self, ctx: Context):
         await ctx.send(embed = discord.Embed(
@@ -30,7 +31,7 @@ class Test(commands.Cog, name = 'test'):
         description = 'Get some info about the server',
         aliases = ['serverinfo']
     )
-    @app_commands.guilds(discord.Object(id = 715252385269678241))
+    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def info(self, ctx: Context):
         embed = discord.Embed(
             title=str(ctx.guild.name),
@@ -65,20 +66,16 @@ class Test(commands.Cog, name = 'test'):
         name='ping',
         description='Check bot delay',
     )
-    @app_commands.guilds(discord.Object(id = 715252385269678241))
+    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def ping(self, ctx: Context):
-        await ctx.send(embed = discord.Embed(
-            title='Ping Received!',
-            description=f'Bot delay is {round(self.bot.latency * 1000, 1)}ms.',
-            colour=0x00E76D
-        ))
-    
+        await ctx.send(f'Pong! Latency is `{round(self.bot.latency * 1000, 1)}ms`')
+
     @commands.hybrid_command(
         name = 'flip',
         description = 'Flip a coin',
-        aliases = ['coinflip']
+        aliases = ['coinflip', 'flipcoin']
     )
-    @app_commands.guilds(discord.Object(id = 715252385269678241))
+    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def flip(self, ctx: Context):
         result = random.choice(['Heads!', 'Tails!'])
         embed = discord.Embed(
@@ -92,7 +89,7 @@ class Test(commands.Cog, name = 'test'):
         await ctx.send(embed=embed)
 
 async def setup(bot):
-    await bot.add_cog(Test(bot))
+    await bot.add_cog(Default(bot))
 
 
 # Helpers
