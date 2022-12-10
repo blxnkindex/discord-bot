@@ -13,9 +13,10 @@ if not os.path.isfile('.env'):
 else:
     load_dotenv()
 
-# Intents - Bot perms (TODO: Change from all (administrator?) to necessary intents/perms)
+# Bot Perms
+intents = discord.Intents.default()
+intents.message_content=True
 
-intents = discord.Intents.all()
 
 bot = Bot(
     command_prefix = commands.when_mentioned_or('>'), 
@@ -28,7 +29,7 @@ async def on_ready():
     print("-------------------")
     # Syncs to test server
     await bot.tree.sync(guild = discord.Object(id = int(os.getenv('MAIN_SERVER'))))
-    await bot.change_presence(activity = discord.Game('Music and music queue now working \'/play\''))
+    await bot.change_presence(activity = discord.Game('Available commands: \'/help\''))
     # presence_randomiser.start()
 
 
