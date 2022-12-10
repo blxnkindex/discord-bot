@@ -3,6 +3,7 @@ import os
 
 import discord
 import youtube_dl
+from default import rand_colour
 from discord import app_commands
 
 from discord.ext import commands
@@ -52,7 +53,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
         return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data)
 
-
 class Music(commands.Cog, name = 'music'):
     def __init__(self, bot):
         self.bot = bot
@@ -85,14 +85,11 @@ class Music(commands.Cog, name = 'music'):
                 await ctx.send("You are not connected to a voice channel.")
                 raise commands.CommandError("Author not connected to a voice channel.")
 
-
         player = await YTDLSource.search(search, loop=self.bot.loop)
         if not ctx.voice_client.is_playing():
             async with ctx.typing():
                 ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
-                ctx.voice_client.pause()
-                await asyncio.sleep(1)
-                ctx.voice_client.resume()
+                await self.player_delay(ctx)
             await ctx.send(f'Now playing: {player.title}')
         else:
             self.queue.append(player)
@@ -100,10 +97,9 @@ class Music(commands.Cog, name = 'music'):
 
     async def play_next(self, ctx):
         player = self.queue.pop(0)
-        ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
-        ctx.voice_client.pause()
         await asyncio.sleep(1)
-        ctx.voice_client.resume()
+        ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
+        await self.player_delay(ctx)
         await ctx.send(f'Now playing: {player.title}')
 
     @commands.hybrid_command(
@@ -116,19 +112,31 @@ class Music(commands.Cog, name = 'music'):
         songs = []
         for song in self.queue:
             songs.append(str(song.title))
-
-        await ctx.send(songs)
+        text = '\n\n'.join(songs)
+        if len(songs) == 0:
+            text = 'Empty! Add songs with >play'
+        embed = discord.Embed(
+            title='Queue', 
+            description=f'```{text}```', 
+            colour=rand_colour()
+        )
+        await ctx.send(embed=embed)
 
     @commands.hybrid_command(
-        name = 'volume',
-        description = 'Change the global volume of music'
+        name = 'skip',
+        description = 'Skip the current song'
     )
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
-    async def volume(self, ctx, volume: int):
-        if ctx.voice_client is None:
-            return await ctx.send("I am not connected to a vc")
-        ctx.voice_client.source.volume = volume / 100
-        await ctx.send(f'`{ctx.author}` changed volume to {volume}%')
+    async def skip(self, ctx):
+        if len(self.queue) == 0:
+            ctx.voice_client.stop()
+            await ctx.send('Last song in queue, stopping...', delete_after=10)
+        else:
+            ctx.voice_client.stop()
+            player = self.queue.pop(0)
+            ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
+            await self.player_delay(ctx)
+            await ctx.send(f'Now playing: {player.title}')
 
     @commands.hybrid_command(
         name = 'pause',
@@ -137,7 +145,7 @@ class Music(commands.Cog, name = 'music'):
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def pause(self, ctx):
         if not ctx.voice_client or not ctx.voice_client.is_playing():
-            return await ctx.send('I am not currently playing anything!', delete_after=20)
+            return await ctx.send('I am not currently playing anything!', delete_after=10)
         elif ctx.voice_client.is_paused():
             return
 
@@ -158,16 +166,46 @@ class Music(commands.Cog, name = 'music'):
         ctx.voice_client.resume()
         await ctx.send(f'`{ctx.author}` Resumed the song!')
 
+    @commands.hybrid_command(
+        name = 'volume',
+        description = 'Change the global volume of music'
+    )
+    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
+    async def volume(self, ctx, volume=None):
+        if not volume:
+            print(ctx.voice_client.source.volume)
+            await ctx.send(f'Current volume is {int(ctx.voice_client.source.volume * 100)}%')
+            return
+        if ctx.voice_client is None:
+            return await ctx.send("I am not connected to a vc")
+        ctx.voice_client.source.volume = int(volume) / 100
+        await ctx.send(f'`{ctx.author}` changed volume to {volume}%')
 
     @commands.hybrid_command(
         name = 'leave',
         description = 'Leaves the channel (also clears the queue)',
-        aliases = ['l', 'clear', 'clearqueue', 'stop']
+        aliases = ['l', 'stop']
     )
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def leave(self, ctx):
         await ctx.send('Left the voice channel, queue is cleared', delete_after=10)
         await ctx.voice_client.disconnect()
+
+    @commands.hybrid_command(
+        name = 'clear',
+        description = 'Clear the queue but doesn\'t leave voice',
+        aliases = ['clearqueue']
+    )
+    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
+    async def clear(self, ctx):
+        ctx.voice_client.stop()        
+        self.queue = []
+        await ctx.send('Queue is cleared.', delete_after=10)
+
+    async def player_delay(self, ctx):
+        ctx.voice_client.pause()
+        await asyncio.sleep(1)
+        ctx.voice_client.resume()
 
 async def setup(bot):
     await bot.add_cog(Music(bot))
