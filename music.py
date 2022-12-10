@@ -53,7 +53,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data)
 
 
-class Music(commands.Cog):
+class Music(commands.Cog, name = 'music'):
     def __init__(self, bot):
         self.bot = bot
         self.queue = []
@@ -87,7 +87,6 @@ class Music(commands.Cog):
 
 
         player = await YTDLSource.search(search, loop=self.bot.loop)
-        print(f'loop: {self.bot.loop}')
         if not ctx.voice_client.is_playing():
             async with ctx.typing():
                 ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
@@ -97,7 +96,7 @@ class Music(commands.Cog):
             await ctx.send(f'Now playing: {player.title}')
         else:
             self.queue.append(player)
-            await ctx.send(f'`{ctx.author}`: Queued: {player.title}')
+            await ctx.send(f'Queued: {player.title}')
 
     async def play_next(self, ctx):
         player = self.queue.pop(0)
@@ -116,7 +115,7 @@ class Music(commands.Cog):
     async def queue(self, ctx):
         songs = []
         for song in self.queue:
-            songs.append(str(song.title)+'\n')
+            songs.append(str(song.title))
 
         await ctx.send(songs)
 
@@ -128,8 +127,8 @@ class Music(commands.Cog):
     async def volume(self, ctx, volume: int):
         if ctx.voice_client is None:
             return await ctx.send("I am not connected to a vc")
-
-        await ctx.send(f"Changed volume to {volume / 100}%")
+        ctx.voice_client.source.volume = volume / 100
+        await ctx.send(f'`{ctx.author}` changed volume to {volume}%')
 
     @commands.hybrid_command(
         name = 'pause',
@@ -143,7 +142,7 @@ class Music(commands.Cog):
             return
 
         ctx.voice_client.pause()
-        await ctx.send(f'`{ctx.author}`: Paused the song!')
+        await ctx.send(f'`{ctx.author}` paused the song!')
 
     @commands.hybrid_command(
         name = 'resume',
@@ -157,13 +156,13 @@ class Music(commands.Cog):
             return
 
         ctx.voice_client.resume()
-        await ctx.send(f'**`{ctx.author}`**: Resumed the song!')
+        await ctx.send(f'`{ctx.author}` Resumed the song!')
 
 
     @commands.hybrid_command(
         name = 'leave',
         description = 'Leaves the channel (also clears the queue)',
-        aliases = ['l', 'clear', 'clearqueue']
+        aliases = ['l', 'clear', 'clearqueue', 'stop']
     )
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def leave(self, ctx):
