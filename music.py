@@ -28,22 +28,26 @@ ytdl_format_options = {
 
 ffmpeg_options = {
     'options': '-vn',
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
-
 class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
+    def __init__(self, source, *, data, volume=0.5, requester=None):
         super().__init__(source, volume)
 
         self.data = data
 
+        # Song data
         self.title = data.get('title')
         self.url = data.get('url')
+        self.tn = data.get('thumbnail')
+        self.duration = data.get('duration')
+        self.requester = requester
 
     @classmethod
-    async def search(cls, url, *, loop=None):
+    async def search(cls, url, requester, *, loop=None):
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
 
@@ -51,7 +55,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
             # take first item from a playlist
             data = data['entries'][0]
 
-        return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data)
+        return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data, requester=requester)
 
 class Music(commands.Cog, name = 'music'):
     def __init__(self, bot):
@@ -64,12 +68,15 @@ class Music(commands.Cog, name = 'music'):
         aliases = ['j']
     )
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
-    async def join(self, ctx):        
+    async def join(self, ctx):
         channel = ctx.message.author.voice.channel
+        if not channel:
+            return await ctx.send('You are not connected to a vc.')
         if ctx.voice_client is not None:
             return await ctx.voice_client.move_to(channel)
 
         await channel.connect()
+        await self.delete_command_message(ctx)
 
     @commands.hybrid_command(
         name = 'play',
@@ -82,25 +89,26 @@ class Music(commands.Cog, name = 'music'):
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
             else:
-                await ctx.send("You are not connected to a voice channel.")
-                raise commands.CommandError("Author not connected to a voice channel.")
-
-        player = await YTDLSource.search(search, loop=self.bot.loop)
+                return await ctx.send('You are not connected to a voice channel.')
+                
+        player = await YTDLSource.search(search, ctx.message.author, loop=self.bot.loop)
         if not ctx.voice_client.is_playing():
             async with ctx.typing():
                 ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
                 await self.player_delay(ctx)
-            await ctx.send(f'Now playing: {player.title}')
+            await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
         else:
             self.queue.append(player)
-            await ctx.send(f'Queued: {player.title}')
+            await ctx.send(embed = self.create_song_embed(player, '⏳ Queued:'))
+            
+        await self.delete_command_message(ctx)
 
     async def play_next(self, ctx):
-        player = self.queue.pop(0)
         await asyncio.sleep(1)
+        player = self.queue.pop(0)
         ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
         await self.player_delay(ctx)
-        await ctx.send(f'Now playing: {player.title}')
+        await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
 
     @commands.hybrid_command(
         name = 'queue',
@@ -116,7 +124,7 @@ class Music(commands.Cog, name = 'music'):
         if len(songs) == 0:
             text = 'Empty! Add songs with >play'
         embed = discord.Embed(
-            title='Queue', 
+            title='Queue 🎵', 
             description=f'```{text}```', 
             colour=rand_colour()
         )
@@ -136,7 +144,7 @@ class Music(commands.Cog, name = 'music'):
             player = self.queue.pop(0)
             ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
             await self.player_delay(ctx)
-            await ctx.send(f'Now playing: {player.title}')
+            await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
 
     @commands.hybrid_command(
         name = 'pause',
@@ -173,11 +181,10 @@ class Music(commands.Cog, name = 'music'):
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def volume(self, ctx, volume=None):
         if not volume:
-            print(ctx.voice_client.source.volume)
             await ctx.send(f'Current volume is {int(ctx.voice_client.source.volume * 100)}%')
             return
         if ctx.voice_client is None:
-            return await ctx.send("I am not connected to a vc")
+            return await ctx.send('I am not connected to a vc')
         ctx.voice_client.source.volume = int(volume) / 100
         await ctx.send(f'`{ctx.author}` changed volume to {volume}%')
 
@@ -206,6 +213,21 @@ class Music(commands.Cog, name = 'music'):
         ctx.voice_client.pause()
         await asyncio.sleep(1)
         ctx.voice_client.resume()
+    
+    async def delete_command_message(self, ctx):
+        if ctx.message.content.startswith('>'):
+            await asyncio.sleep(5)
+            await ctx.message.delete()
 
+    def create_song_embed(self, player, title):
+        embed = discord.Embed(
+            title=title,
+            description=player.title  + f'\n\nrequested by `{player.requester}`',
+            colour=rand_colour()
+        )
+        embed.set_thumbnail(url=player.tn)
+        embed.set_footer(text=f'{int(player.duration / 60)} minutes {int(player.duration % 60)} seconds')
+        return embed
+        
 async def setup(bot):
     await bot.add_cog(Music(bot))
