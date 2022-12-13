@@ -29,7 +29,7 @@ class Default(commands.Cog, name = 'default'):
                 description = command.description.partition('\n')[0]
                 cmds.append(f'>{command.name}: {description}')
                 cmd = "\n".join(cmds)
-            embed.add_field(name=i.capitalize() + 'commands',
+            embed.add_field(name=i.capitalize() + ' commands',
                             value=f'```{cmd}```', inline=False)
 
         await ctx.send(embed=embed)
@@ -43,7 +43,7 @@ class Default(commands.Cog, name = 'default'):
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def info(self, ctx):
         embed = discord.Embed(
-            title=str(ctx.author),
+            title='Server Info 💬',
             description=str(ctx.guild.name),
             colour=rand_colour()
         )
