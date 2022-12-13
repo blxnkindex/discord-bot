@@ -51,5 +51,18 @@ class Misc(commands.Cog, name = 'misc'):
             embed.set_image(url='https://cdn.discordapp.com/attachments/1050680252453625886/1050707443283415060/tails.png')
         await ctx.send(embed=embed)
 
+    @commands.command(
+        name = ':)',
+        hidden=True
+    )
+    async def smile(self, ctx: Context):
+        embed = discord.Embed(
+            title='>:)',
+            colour=rand_colour()
+        )
+        embed.set_image(url='https://cdn.discordapp.com/attachments/1051608996957659136/1052032183658872892/22365_7n8locko3.png')
+        
+        await ctx.send(embed=embed)
+
 async def setup(bot):
     await bot.add_cog(Misc(bot))
