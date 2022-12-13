@@ -28,17 +28,23 @@ ytdl_format_options = {
 
 ffmpeg_options = {
     'options': '-vn',
+    # Reconnect options prevent corrupt 
+    # packets from force skipping a song
+    # Source: https://stackoverflow.com/questions/66070749/
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
+'''
+Instances created for each requested song
+Source: https://github.com/Rapptz/discord.py/blob/master/examples/basic_voice.py
+'''
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5, requester=None):
         super().__init__(source, volume)
 
         self.data = data
-
         # Song data
         self.title = data.get('title')
         self.url = data.get('url')
@@ -57,9 +63,13 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
         return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data, requester=requester)
 
+'''
+Main cog for music commands
+'''
 class Music(commands.Cog, name = 'music'):
     def __init__(self, bot):
         self.bot = bot
+        self.current = None
         self.queue = []
 
     @commands.hybrid_command(
@@ -71,7 +81,7 @@ class Music(commands.Cog, name = 'music'):
     async def join(self, ctx):
         channel = ctx.message.author.voice.channel
         if not channel:
-            return await ctx.send('You are not connected to a vc.')
+            return await ctx.send('You are not connected to a vc', delete_after=10)
         if ctx.voice_client is not None:
             return await ctx.voice_client.move_to(channel)
 
@@ -89,13 +99,14 @@ class Music(commands.Cog, name = 'music'):
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
             else:
-                return await ctx.send('You are not connected to a voice channel.')
-                
+                return await ctx.send('You are not connected to a vc', delete_after=10)
+
         player = await YTDLSource.search(search, ctx.message.author, loop=self.bot.loop)
         if not ctx.voice_client.is_playing():
             async with ctx.typing():
                 ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
                 await self.player_delay(ctx)
+            self.current = player
             await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
         else:
             self.queue.append(player)
@@ -106,28 +117,37 @@ class Music(commands.Cog, name = 'music'):
     async def play_next(self, ctx):
         await asyncio.sleep(1)
         player = self.queue.pop(0)
+        self.current = player
         ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
         await self.player_delay(ctx)
         await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
 
     @commands.hybrid_command(
         name = 'queue',
-        description = 'Displays the queue',
+        description = 'Displays the next 10 songs in queue',
         aliases = ['q']
     )
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def queue(self, ctx):
-        songs = []
-        for song in self.queue:
-            songs.append(str(song.title))
-        text = '\n\n'.join(songs)
-        if len(songs) == 0:
-            text = 'Empty! Add songs with >play'
         embed = discord.Embed(
-            title='Queue 🎵', 
-            description=f'```{text}```', 
+            title='Queue 🎵',
             colour=rand_colour()
-        )
+        )        
+        if not ctx.voice_client.is_playing():
+            self.current = None
+        if self.current:
+            embed.add_field(name='Current Song', value=f'```{self.current.title}```', inline=False)
+            embed.set_thumbnail(url=self.current.tn)
+            songs = []
+            for i in range(min(len(self.queue), 10)):
+                songs.append(str(self.queue[i].title))
+            if len(songs) == 0:
+                text = 'Empty! Add more songs with >play'
+            else:
+                text = '\n\n'.join(songs)
+            embed.add_field(name='Queue', value=f'```{text}```')
+        else:
+            embed.add_field(name='Current Song', value=f'```Not playing anything! Add songs with >play```', inline=False)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -136,12 +156,16 @@ class Music(commands.Cog, name = 'music'):
     )
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def skip(self, ctx):
+        if not ctx.voice_client or not ctx.voice_client.is_playing():
+            return await ctx.send('I am not currently playing anything!', delete_after=10)
         if len(self.queue) == 0:
             ctx.voice_client.stop()
+            self.current = None
             await ctx.send('Last song in queue, stopping...', delete_after=10)
         else:
             ctx.voice_client.stop()
             player = self.queue.pop(0)
+            self.current = player
             ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
             await self.player_delay(ctx)
             await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
@@ -228,6 +252,7 @@ class Music(commands.Cog, name = 'music'):
         embed.set_thumbnail(url=player.tn)
         embed.set_footer(text=f'{int(player.duration / 60)} minutes {int(player.duration % 60)} seconds')
         return embed
+
         
 async def setup(bot):
     await bot.add_cog(Music(bot))
