@@ -45,8 +45,10 @@ async def on_command_error(ctx: Context, error):
 
 @tasks.loop(minutes=.5)
 async def presence_randomiser():
-    status = ['manifesting gunblade\'s return', 'buffing camille (she\'s weak)', 'watching walking dead', 'getting unlucky',
-    'picking ziggs (20th game straight)', 'making music queue', 'changing profile pictures', 'complaining about twitch ult', 'complaining about katarina damage']
+    status = ['complaining about katarina items', 'why is sivir -15% damage', 'complaining about aram ziggs',
+    'complaining about twitch ult', 'complaining about camille (sunderer is really bad)', 'going gym', 'watching world cup',
+    'writing the source code', 'failing uni', 'not having internship', 'being doomer', 'retail therapy',
+    'listening to rach (we\'re first name basis)', 'the slow lee sin ward hop']
     await bot.change_presence(activity=discord.Game(name = random.choice(status)))
 
 async def load_extensions():
@@ -57,4 +59,6 @@ async def load_extensions():
             print("-------------------")
 
 asyncio.run(load_extensions())
+
+# Run with log_handler=None to disable discord output.
 bot.run(os.getenv('TOKEN'))
