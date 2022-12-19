@@ -29,7 +29,7 @@ async def on_ready():
     print("-------------------")
     # Syncs to test server
     await bot.tree.sync(guild = discord.Object(id = int(os.getenv('MAIN_SERVER'))))
-    await bot.change_presence(activity = discord.Game('Available commands: \'/help\''))
+    await bot.change_presence(activity = discord.Game('Available commands: \'>help\''))
     # presence_randomiser.start()
 
 

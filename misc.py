@@ -14,7 +14,7 @@ class Misc(commands.Cog, name = 'misc'):
     @commands.hybrid_command(
         name = 'pug',
         description = 'Creates two teams randomly',
-        aliases = ['maketeam', 'teams']
+        aliases = ['teams']
     )
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def pug(self, ctx, *, players):
@@ -24,7 +24,7 @@ class Misc(commands.Cog, name = 'misc'):
             return
         embed = discord.Embed(
             title='Teams', 
-            description=f'Players: {" ".join(players)}', 
+            description=f'Map: {random.choice(["Ascent", "Bind", "Breeze", "Fracture", "Haven", "Icebox", "Pearl", "Split"])}',
             colour=0xFFFFFF
         )
         random.shuffle(players)
@@ -60,7 +60,20 @@ class Misc(commands.Cog, name = 'misc'):
             title='>:)',
             colour=rand_colour()
         )
-        embed.set_image(url='https://cdn.discordapp.com/attachments/1051608996957659136/1052032183658872892/22365_7n8locko3.png')
+        embed.set_image(url='https://cdn.discordapp.com/attachments/1050680252453625886/1052448377402564659/3x_11.png')
+        
+        await ctx.send(embed=embed)
+    
+    @commands.command(
+        name = ':(',
+        hidden=True
+    )
+    async def frown(self, ctx: Context):
+        embed = discord.Embed(
+            title='>:(',
+            colour=rand_colour()
+        )
+        embed.set_image(url='https://cdn.discordapp.com/attachments/1050680252453625886/1052449074458140762/3x_3.png')
         
         await ctx.send(embed=embed)
 

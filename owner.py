@@ -15,10 +15,12 @@ class Owner(commands.Cog, name = 'owner'):
         else:
             await ctx.send(f'Extension {cog} successfully restarted', delete_after=5)
             await ctx.message.delete()
+            print(f'Extension {cog} reloaded')
 
     @commands.command(name='botleave', hidden=True)
     @commands.is_owner()
     async def botleave(self, ctx):
+        await ctx.message.delete()
         print(f'Leaving server {ctx.guild.name}')
         await ctx.guild.leave()
 
