@@ -13,11 +13,14 @@ from discord.ext import commands
 youtube_dl.utils.bug_reports_message = lambda: ''
 
 
+
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
-    'noplaylist': True,
+    'noplaylist': False,
+    'playliststart': 1,
+    'playlistend': 21,
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
@@ -27,11 +30,12 @@ ytdl_format_options = {
     'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
+
+# Reconnect options prevent corrupt 
+# packets from force skipping a song
+# Source: https://stackoverflow.com/questions/66070749/
 ffmpeg_options = {
     'options': '-vn',
-    # Reconnect options prevent corrupt 
-    # packets from force skipping a song
-    # Source: https://stackoverflow.com/questions/66070749/
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
 }
 
@@ -42,7 +46,7 @@ Instances created for each requested song
 Source: https://github.com/Rapptz/discord.py/blob/master/examples/basic_voice.py
 '''
 class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.20, requester=None):
+    def __init__(self, source, *, data, volume=0.33, requester=None):
         super().__init__(source, volume)
 
         self.data = data
@@ -58,11 +62,15 @@ class YTDLSource(discord.PCMVolumeTransformer):
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
 
+        songs = []
         if 'entries' in data:
-            # take first item from a playlist
-            data = data['entries'][0]
-
-        return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data, requester=requester)
+            for i in range(min(len(data['entries']), 25)):
+                info = data['entries'][i]
+                s = cls(discord.FFmpegPCMAudio(info['url'], **ffmpeg_options), data=info, requester=requester)
+                songs.append(s)
+        else:
+            songs.append(cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data, requester=requester))
+        return songs
 
 '''
 Main cog for music commands
@@ -96,7 +104,8 @@ class Music(commands.Cog, name = 'music'):
             else:
                 return await ctx.send('You are not connected to a voice channel.', delete_after=10)
 
-        player = await YTDLSource.source(search, ctx.message.author, loop=self.bot.loop)
+        songs = await YTDLSource.source(search, ctx.message.author, loop=self.bot.loop)
+        player = songs.pop(0)
         if not ctx.voice_client.is_playing():
             async with ctx.typing():
                 ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
@@ -106,7 +115,12 @@ class Music(commands.Cog, name = 'music'):
         else:
             self.queue.append(player)
             await ctx.send(embed = self.create_song_embed(player, '⏳ Queued:'))
-            
+        if songs:
+            for i in songs:
+                self.queue.append(i)
+            await ctx.send(f'Queued {len(songs)} songs from playlist')
+
+
         await self.delete_command_message(ctx)
 
     async def play_next(self, ctx):
@@ -115,6 +129,7 @@ class Music(commands.Cog, name = 'music'):
         ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
         await self.player_delay(ctx)
         await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
+
 
     @commands.hybrid_command(name = 'queue', description = 'Displays the next 10 songs in queue', aliases = ['q'])
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
@@ -151,7 +166,7 @@ class Music(commands.Cog, name = 'music'):
             self.current = None
         else:
             ctx.voice_client.stop()
-            await ctx.send(embed = self.create_song_embed(self.current, '⌛ Skipped:'))
+        await ctx.send(embed = self.create_song_embed(self.current, '⌛ Skipped:'))
     
     @commands.hybrid_command(name = 'shuffle', description = 'Shuffle the queue')
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
@@ -167,15 +182,15 @@ class Music(commands.Cog, name = 'music'):
     @commands.hybrid_command(name = 'pause', description = '(Un)pauses current music')
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def pause(self, ctx):
-        if not ctx.voice_client or not ctx.voice_client.is_playing():
+        if not ctx.voice_client:
             return await ctx.send('I am not currently playing anything.', delete_after=10)
         elif ctx.voice_client.is_paused():
             ctx.voice_client.resume()
             return await ctx.send(f'`{ctx.author}` Resumed the song')
         elif not ctx.voice_client.is_paused():
-            ctx.voice_client.pause
+            ctx.voice_client.pause()
             return await ctx.send(f'`{ctx.author}` paused the song')
-        ctx.send('Error in pause: unhandled case')
+        return await ctx.send('Error in pause: unhandled case')
 
     @commands.hybrid_command(name = 'volume', description = 'Change the global volume of music')
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
@@ -192,6 +207,7 @@ class Music(commands.Cog, name = 'music'):
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def leave(self, ctx):
         if ctx.voice_client:
+            self.queue = []
             await ctx.send('Left the voice channel, queue is cleared', delete_after=10)
             await ctx.voice_client.disconnect()
         else:
