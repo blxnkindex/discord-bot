@@ -46,31 +46,25 @@ Instances created for each requested song
 Source: https://github.com/Rapptz/discord.py/blob/master/examples/basic_voice.py
 '''
 class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.33, requester=None):
+    def __init__(self, source, *, data, volume=0.10):
         super().__init__(source, volume)
 
         self.data = data
         # Song data
         self.title = data.get('title')
         self.url = data.get('url')
-        self.tn = data.get('thumbnail')
-        self.duration = data.get('duration')
-        self.requester = requester
 
     @classmethod
-    async def source(cls, url, requester, *, loop=None):
+    async def source(cls, song, loop=None):
         loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
+        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(song['webpage_url'], download=False))
 
-        songs = []
+        # This should never be necessary
         if 'entries' in data:
-            for i in range(min(len(data['entries']), 25)):
-                info = data['entries'][i]
-                s = cls(discord.FFmpegPCMAudio(info['url'], **ffmpeg_options), data=info, requester=requester)
-                songs.append(s)
-        else:
-            songs.append(cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data, requester=requester))
-        return songs
+            print('entries are in data which shouldn\'t be possible')
+            data = data['entries'][0]
+
+        return cls(discord.FFmpegPCMAudio(data['url'], **ffmpeg_options), data=data)
 
 '''
 Main cog for music commands
@@ -104,48 +98,46 @@ class Music(commands.Cog, name = 'music'):
             else:
                 return await ctx.send('You are not connected to a voice channel.', delete_after=10)
 
-        songs = await YTDLSource.source(search, ctx.message.author, loop=self.bot.loop)
-        player = songs.pop(0)
+        response = await song_search(search, ctx.message.author, loop=self.bot.loop)
+        song = response['songs'].pop(0)
         if not ctx.voice_client.is_playing():
+            player = await YTDLSource.source(song, loop=self.bot.loop)
             async with ctx.typing():
                 ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
                 await self.player_delay(ctx)
-            self.current = player
-            await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
+            self.current = song
+            await ctx.send(embed = self.create_song_embed(song, '🎵  Now Playing:'))
         else:
-            self.queue.append(player)
-            await ctx.send(embed = self.create_song_embed(player, '⏳ Queued:'))
-        if songs:
-            for i in songs:
+            self.queue.append(song)
+            await ctx.send(embed = self.create_song_embed(song, '⏳ Queued:'))
+        if response['songs']:
+            for i in response['songs']:
                 self.queue.append(i)
-            await ctx.send(f'Queued {len(songs)} songs from playlist')
-
+            await ctx.send(f'Queued {len(response["songs"])} songs from {response["pl_name"]}')
 
         await self.delete_command_message(ctx)
 
     async def play_next(self, ctx):
-        player = self.queue.pop(0)
-        self.current = player
+        song = self.queue.pop(0)
+        player = await YTDLSource.source(song, loop=self.bot.loop)
+        self.current = song
         ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
         await self.player_delay(ctx)
-        await ctx.send(embed = self.create_song_embed(player, '🎵  Now Playing:'))
+        await ctx.send(embed = self.create_song_embed(song, '🎵  Now Playing:'))
 
 
     @commands.hybrid_command(name = 'queue', description = 'Displays the next 10 songs in queue', aliases = ['q'])
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def queue(self, ctx):
-        embed = discord.Embed(
-            title='Queue 🎵',
-            colour=rand_colour()
-        )
+        embed = discord.Embed(title='Queue 🎵', colour=rand_colour())
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             self.current = None
         if self.current:
-            embed.add_field(name='Current Song', value=f'```{self.current.title}```', inline=False)
-            embed.set_thumbnail(url=self.current.tn)
+            embed.add_field(name='Current Song', value=f'```{self.current["title"]}```', inline=False)
+            embed.set_thumbnail(url=self.current["tn"])
             songs = []
             for i in range(min(len(self.queue), 10)):
-                songs.append(str(self.queue[i].title))
+                songs.append(str(self.queue[i]['title']))
             if len(songs) == 0:
                 text = 'Empty. Add more songs with >play'
             else:
@@ -161,12 +153,14 @@ class Music(commands.Cog, name = 'music'):
     async def skip(self, ctx):
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             return await ctx.send('I am not playing anything.', delete_after=10)
+        skipped = self.current
         if len(self.queue) == 0:
             ctx.voice_client.stop()
             self.current = None
         else:
             ctx.voice_client.stop()
-        await ctx.send(embed = self.create_song_embed(self.current, '⌛ Skipped:'))
+        if skipped:
+            await ctx.send(embed = self.create_song_embed(skipped, '⌛ Skipped:'))
     
     @commands.hybrid_command(name = 'shuffle', description = 'Shuffle the queue')
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
@@ -213,7 +207,6 @@ class Music(commands.Cog, name = 'music'):
         else:
             await ctx.send('Not in a vc', delete_after=3)
 
-
     @commands.hybrid_command(name = 'clear', description = 'Clear the queue')
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def clear(self, ctx):
@@ -233,22 +226,47 @@ class Music(commands.Cog, name = 'music'):
             await asyncio.sleep(5)
             await ctx.message.delete()
 
-    def create_song_embed(self, player, title):
+    def create_song_embed(self, song, title):
         embed = discord.Embed(
             title=title,
-            description=player.title  + f'\n\nrequested by `{player.requester}`',
+            description=song['title']  + f'\n\nrequested by `{song["requester"]}`',
             colour=rand_colour()
         )
-        embed.set_thumbnail(url=player.tn)
-        embed.set_footer(text=f'{int(player.duration / 60)} minutes {int(player.duration % 60)} seconds')
+        embed.set_thumbnail(url=song['tn'])
+        embed.set_footer(text=f'{int(song["duration"] / 60)} minutes {int(song["duration"] % 60)} seconds')
         return embed
 
     def queue_duration(self):
-        duration = self.current.duration
+        duration = self.current['duration']
         for song in self.queue:
-            duration += song.duration
+            duration += song['duration']
         return f'{int(duration / 60)} minutes {int(duration % 60)} seconds'
 
+
+async def song_search(url, requester, *, loop=None):
+    loop = loop or asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
+    
+    response = {}
+    response['songs'] = []
+    
+    if 'entries' in data:
+        for i in range(0, len(data['entries'])):
+            info = data['entries'][i]
+            response['songs'].append(get_song_data(info, requester))
+            response['pl_name'] = info['playlist_title']
+    else:
+        response['songs'].append(get_song_data(data, requester))
+    return response
+
+def get_song_data(info, requester):
+    song = {}
+    song['title'] = info['title']
+    song['webpage_url'] = info['webpage_url']
+    song['tn'] = info['thumbnail']
+    song['duration'] = info['duration']
+    song['requester'] = requester
+    return song
         
 async def setup(bot):
     await bot.add_cog(Music(bot))
