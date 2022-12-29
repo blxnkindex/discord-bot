@@ -4,6 +4,6 @@
 
 <h1>TODOS:</h1>
 
-<p>- Add code comments and attribute sources</p>
-<p>- Smooth out bot command usage</p>
-<p>- Add more cogs</p>
+<p>- Eventually support longer playlists without that terrible processing delay</p>
+<p>- Smooth out bot command usage (cover edge cases)</p>
+<p>- Think of more cogs to make zzz..</p>
