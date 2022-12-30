@@ -60,9 +60,10 @@ class Misc(commands.Cog, name = 'misc'):
             title='>:)',
             colour=rand_colour()
         )
-        embed.set_image(url='https://cdn.discordapp.com/attachments/1050680252453625886/1052448377402564659/3x_11.png')
+        file = discord.File('./assets/smiles/stare.png', filename='stare.png')
+        embed.set_image(url='attachment://stare.png')
         
-        await ctx.send(embed=embed)
+        await ctx.send(file=file, embed=embed)
     
     @commands.command(
         name = ':(',
@@ -73,9 +74,9 @@ class Misc(commands.Cog, name = 'misc'):
             title='>:(',
             colour=rand_colour()
         )
-        embed.set_image(url='https://cdn.discordapp.com/attachments/1050680252453625886/1052449074458140762/3x_3.png')
-        
-        await ctx.send(embed=embed)
+        file = discord.File('./assets/smiles/mad.png', filename='mad.png')
+        embed.set_image(url='attachment://mad.png')
+        await ctx.send(file=file, embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Misc(bot))

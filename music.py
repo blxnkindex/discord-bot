@@ -46,7 +46,7 @@ Instances created for each requested song
 Source: https://github.com/Rapptz/discord.py/blob/master/examples/basic_voice.py
 '''
 class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.10):
+    def __init__(self, source, *, data, volume=0.33):
         super().__init__(source, volume)
 
         self.data = data

@@ -21,7 +21,7 @@ class Owner(commands.Cog, name = 'owner'):
     @commands.is_owner()
     async def load(self, ctx, *, cog: str):
         try:
-             self.bot.load_extension(cog)
+            await self.bot.load_extension(cog)
         except Exception as e:
             await ctx.send(e)
         else:
@@ -33,7 +33,7 @@ class Owner(commands.Cog, name = 'owner'):
     @commands.is_owner()
     async def unload(self, ctx, *, cog: str):
         try:
-            self.bot.unload_extension(cog)
+            await self.bot.unload_extension(cog)
         except Exception as e:
             await ctx.send(e)
         else:
