@@ -17,11 +17,7 @@ else:
 intents = discord.Intents.default()
 intents.message_content=True
 
-
-bot = Bot(
-    command_prefix = commands.when_mentioned_or('>'), 
-    intents = intents, help_command = None
-)
+bot = Bot(command_prefix = commands.when_mentioned_or('>'), intents = intents, help_command = None)
 
 @bot.event
 async def on_ready():
@@ -29,7 +25,7 @@ async def on_ready():
     print("-------------------")
     # Syncs to test server
     await bot.tree.sync(guild = discord.Object(id = int(os.getenv('MAIN_SERVER'))))
-    await bot.change_presence(activity = discord.Game('Available commands: \'>help\''))
+    await bot.change_presence(activity = discord.Game('Happy New Years!: \'>help\''))
     # presence_randomiser.start()
 
 
@@ -52,13 +48,18 @@ async def presence_randomiser():
     await bot.change_presence(activity=discord.Game(name = random.choice(status)))
 
 async def load_extensions():
-    for file in os.listdir('./'):
-        if file.endswith('.py') and not file == 'main.py':
-            await bot.load_extension(str(file[:-3]))
+    for file in os.listdir('./cogs/'):
+        if file.endswith('.py') and not (file == 'main.py' or file == 'utils.py'):
+            await bot.load_extension(f'cogs.{str(file[:-3])}')
             print(f'>>> Loaded Extension: {str(file[:-3])}')
             print("-------------------")
 
-asyncio.run(load_extensions())
-
-# Run with log_handler=None to disable discord output.
-bot.run(os.getenv('TOKEN'))
+if __name__ == "__main__":
+    asyncio.run(load_extensions())
+    if len(sys.argv) == 1:
+        # Run with log_handler=None to disable discord output.
+        bot.run(os.getenv('TOKEN'))
+    elif len(sys.argv) == 2 and sys.argv[1] == '--nooutput':
+        print(f'>>> Launched with noouput flag will NOT output any discord output')
+        print("-------------------")
+        bot.run(os.getenv('TOKEN'), log_handler=None)

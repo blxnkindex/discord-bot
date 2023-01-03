@@ -48,5 +48,14 @@ class Owner(commands.Cog, name = 'owner'):
         print(f'Leaving server {ctx.guild.name}')
         await ctx.guild.leave()
 
+    @commands.command(
+        name = 'resetname',
+        hidden=True
+    )
+    @commands.is_owner()
+    async def resetmisakaname(self, ctx):
+        await ctx.message.guild.get_member(1047658017988030515).edit(nick="")
+        await ctx.message.delete()
+
 async def setup(bot):
     await bot.add_cog(Owner(bot))

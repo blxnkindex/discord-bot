@@ -4,41 +4,16 @@ import os
 import discord
 import youtube_dl
 import random
-from default import rand_colour
+import DiscordUtils
 from discord import app_commands
-
 from discord.ext import commands
+
+from utils import ytdl_format_options, ffmpeg_options
+from utils import player_delay, delete_command_message, get_song_data, create_song_embed, rand_colour
+
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
-
-
-
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'noplaylist': False,
-    'playliststart': 1,
-    'playlistend': 21,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
-}
-
-
-# Reconnect options prevent corrupt 
-# packets from force skipping a song
-# Source: https://stackoverflow.com/questions/66070749/
-ffmpeg_options = {
-    'options': '-vn',
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
-}
-
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 '''
@@ -87,7 +62,7 @@ class Music(commands.Cog, name = 'music'):
             return await ctx.voice_client.move_to(channel)
 
         await channel.connect()
-        await self.delete_command_message(ctx)
+        await delete_command_message(ctx)
 
     @commands.hybrid_command(name = 'play', description = 'Plays/searches youtube for a song', aliases = ['p'])
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
@@ -98,55 +73,78 @@ class Music(commands.Cog, name = 'music'):
             else:
                 return await ctx.send('You are not connected to a voice channel.', delete_after=10)
 
-        response = await song_search(search, ctx.message.author, loop=self.bot.loop)
+        async with ctx.typing():
+            response = await song_search(search, ctx.message.author, loop=self.bot.loop)
         song = response['songs'].pop(0)
         if not ctx.voice_client.is_playing():
             player = await YTDLSource.source(song, loop=self.bot.loop)
             async with ctx.typing():
                 ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
-                await self.player_delay(ctx)
+                await player_delay(ctx)
             self.current = song
-            await ctx.send(embed = self.create_song_embed(song, '🎵  Now Playing:'))
+            await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
         else:
             self.queue.append(song)
-            await ctx.send(embed = self.create_song_embed(song, '⏳ Queued:'))
+            await ctx.send(embed = create_song_embed(song, '⏳ Queued:'))
         if response['songs']:
             for i in response['songs']:
                 self.queue.append(i)
             await ctx.send(f'Queued {len(response["songs"])} songs from {response["pl_name"]}')
 
-        await self.delete_command_message(ctx)
+        await delete_command_message(ctx)
 
     async def play_next(self, ctx):
         song = self.queue.pop(0)
         player = await YTDLSource.source(song, loop=self.bot.loop)
         self.current = song
         ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
-        await self.player_delay(ctx)
-        await ctx.send(embed = self.create_song_embed(song, '🎵  Now Playing:'))
+        await player_delay(ctx)
+        await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
 
 
     @commands.hybrid_command(name = 'queue', description = 'Displays the next 10 songs in queue', aliases = ['q'])
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def queue(self, ctx):
-        embed = discord.Embed(title='Queue 🎵', colour=rand_colour())
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             self.current = None
         if self.current:
-            embed.add_field(name='Current Song', value=f'```{self.current["title"]}```', inline=False)
-            embed.set_thumbnail(url=self.current["tn"])
-            songs = []
-            for i in range(min(len(self.queue), 10)):
-                songs.append(str(self.queue[i]['title']))
-            if len(songs) == 0:
-                text = 'Empty. Add more songs with >play'
+            embeds = []
+            if len(self.queue) != 0:
+                for i in range(0, len(self.queue), 10):
+                    embeds.append(self.get_queue_embeds(i))
+                if len(embeds) == 1:
+                    return await ctx.send(embed=embeds.pop(0))
+                else:
+                    paginator = DiscordUtils.Pagination.CustomEmbedPaginator(ctx)
+                    paginator.add_reaction('⏪', "back")
+                    paginator.add_reaction('⏩', "next")
+                    
+                    await paginator.run(embeds)
             else:
-                text = '\n\n'.join(songs)
-            embed.add_field(name='Queue', value=f'```{text}```')
-            embed.set_footer(text=self.queue_duration())
+                embed = discord.Embed(title='Queue 🎵', colour=rand_colour())
+                embed.add_field(name='Current Song', value=f'```{self.current["title"]}```', inline=False)
+                embed.set_thumbnail(url=self.current["tn"])
+                return await ctx.send(embed=embed)
         else:
+            embed = discord.Embed(title='Queue 🎵', colour=rand_colour())
             embed.add_field(name='Current Song', value=f'```Not playing anything. Add songs with >play```', inline=False)
-        await ctx.send(embed=embed)
+            return await ctx.send(embed=embed)
+
+    def get_queue_embeds(self, i):
+        embed = discord.Embed(title='Queue 🎵', colour=rand_colour())
+        embed.add_field(name='Current Song', value=f'```{self.current["title"]}```', inline=False)
+        embed.set_thumbnail(url=self.current["tn"])
+        songs = []
+        cap = min(len(self.queue), i + 10)
+        for j in range(i, cap):
+            songs.append(str(self.queue[j]['title']))
+        if len(songs) == 0:
+            text = 'Empty. Add more songs with >play'
+        else:
+            text = '\n\n'.join(songs)
+        embed.add_field(name=f'{i + 1} to {cap + 1} of {len(self.queue) + 1} songs', value=f'```{text}```')
+        embed.set_footer(text=f'Queue Duration: {self.queue_duration()}')
+        return embed
 
     @commands.hybrid_command(name = 'skip', description = 'Skip the current song', aliases = ['s'])
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
@@ -160,7 +158,7 @@ class Music(commands.Cog, name = 'music'):
         else:
             ctx.voice_client.stop()
         if skipped:
-            await ctx.send(embed = self.create_song_embed(skipped, '⌛ Skipped:'))
+            await ctx.send(embed = create_song_embed(skipped, '⌛ Skipped:'))
     
     @commands.hybrid_command(name = 'shuffle', description = 'Shuffle the queue')
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
@@ -216,32 +214,11 @@ class Music(commands.Cog, name = 'music'):
             self.queue = []
             await ctx.send('Queue is cleared.', delete_after=10)
 
-    async def player_delay(self, ctx):
-        ctx.voice_client.pause()
-        await asyncio.sleep(1)
-        ctx.voice_client.resume()
-    
-    async def delete_command_message(self, ctx):
-        if ctx.message.content.startswith('>'):
-            await asyncio.sleep(5)
-            await ctx.message.delete()
-
-    def create_song_embed(self, song, title):
-        embed = discord.Embed(
-            title=title,
-            description=song['title']  + f'\n\nrequested by `{song["requester"]}`',
-            colour=rand_colour()
-        )
-        embed.set_thumbnail(url=song['tn'])
-        embed.set_footer(text=f'{int(song["duration"] / 60)} minutes {int(song["duration"] % 60)} seconds')
-        return embed
-
     def queue_duration(self):
         duration = self.current['duration']
         for song in self.queue:
             duration += song['duration']
         return f'{int(duration / 60)} minutes {int(duration % 60)} seconds'
-
 
 async def song_search(url, requester, *, loop=None):
     loop = loop or asyncio.get_event_loop()
@@ -259,14 +236,5 @@ async def song_search(url, requester, *, loop=None):
         response['songs'].append(get_song_data(data, requester))
     return response
 
-def get_song_data(info, requester):
-    song = {}
-    song['title'] = info['title']
-    song['webpage_url'] = info['webpage_url']
-    song['tn'] = info['thumbnail']
-    song['duration'] = info['duration']
-    song['requester'] = requester
-    return song
-        
 async def setup(bot):
     await bot.add_cog(Music(bot))

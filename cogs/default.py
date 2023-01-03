@@ -3,9 +3,8 @@ import os
 from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
-from discord import Colour
 
-import random
+from utils import rand_colour
 
 class Default(commands.Cog, name = 'default'):
     def __init__(self, bot):
@@ -15,21 +14,16 @@ class Default(commands.Cog, name = 'default'):
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def help(self, ctx):
         hidden = [':)', ':(']
-        embed = discord.Embed(
-            title='Help 💬',
-            description='**Available commands:**',
-            color=0xFFFFF
-        )
+        embed = discord.Embed(title='Help 💬', description='**Available commands:**', color=0xFFFFF)
         for i in self.bot.cogs:
             cmds = []
-            if not i.lower() == 'owner':
+            if not (i.lower() == 'owner' or i.lower() == 'angelwork'):
                 for command in self.bot.get_cog(i.lower()).get_commands():
                     if command.name not in hidden:
                         description = command.description.partition('\n')[0]
                         cmds.append(f'>{command.name} -  {description}')
                         cmd = "\n".join(cmds)
-                embed.add_field(name=i.capitalize() + ' commands',
-                                value=f'```{cmd}```', inline=False)
+                embed.add_field(name=i.capitalize() + ' commands', value=f'```{cmd}```', inline=False)
 
         await ctx.send(embed=embed)
 
@@ -37,11 +31,7 @@ class Default(commands.Cog, name = 'default'):
     @commands.hybrid_command(name = 'info', description = 'Get some info about the server', aliases = ['serverinfo'])
     @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def info(self, ctx):
-        embed = discord.Embed(
-            title='Server Info 💬',
-            description=str(ctx.guild.name),
-            colour=rand_colour()
-        )
+        embed = discord.Embed(title='Server Info 💬', description=str(ctx.guild.name), colour=rand_colour())
         if ctx.guild.icon:
             embed.set_thumbnail(url=ctx.guild.icon.url)
 
@@ -59,7 +49,3 @@ class Default(commands.Cog, name = 'default'):
 
 async def setup(bot):
     await bot.add_cog(Default(bot))
-
-# Helpers
-def rand_colour():
-    return Colour.from_rgb(random.randint(0, 255),random.randint(0, 255),random.randint(0, 255))
