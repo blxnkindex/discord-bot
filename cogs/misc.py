@@ -12,7 +12,6 @@ class Misc(commands.Cog, name = 'misc'):
         self.bot = bot
 
     @commands.hybrid_command(name = 'flip', description = 'Flip a coin', aliases = ['coinflip', 'flipcoin'])
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def flip(self, ctx: Context):
         result = random.choice(['Heads', 'Tails'])
         embed = discord.Embed(title=result, colour=rand_colour())

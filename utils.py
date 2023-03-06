@@ -37,7 +37,6 @@ ytdl_format_options = {
 # packets from force skipping a song
 # Source: https://stackoverflow.com/questions/66070749/ 
 ffmpeg_options = {
-    'options': '-vn',
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
 }
 
@@ -62,7 +61,7 @@ def get_song_data(info, requester):
 
 def create_song_embed(song, title):
     embed = discord.Embed(
-        itle=title,
+        title=title,
         description=song['title']  + f'\n\nrequested by `{song["requester"]}`',
         colour=rand_colour()
     )
