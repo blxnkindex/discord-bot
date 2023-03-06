@@ -25,7 +25,7 @@ async def on_ready():
     print("-------------------")
     # Syncs to test server
     await bot.tree.sync(guild = discord.Object(id = int(os.getenv('MAIN_SERVER'))))
-    await bot.change_presence(activity = discord.Game('Happy New Years!: \'>help\''))
+    await bot.change_presence(activity = discord.Game('Commands: \'>help\''))
     # presence_randomiser.start()
 
 
@@ -36,15 +36,19 @@ async def on_message(message):
     await bot.process_commands(message)
 
 @bot.event
-async def on_command_error(ctx: Context, error):
-    await ctx.reply(error, ephemeral = True)
+async def on_command_error(ctx, exc):
+		# If the command does not exist/is not found.
+		if isinstance(exc, commands.CommandNotFound):
+			await ctx.send("Command not found", delete_after=10)
+		elif isinstance(exc, commands.MissingPermissions):
+			pass
+		elif isinstance(exc, commands.BotMissingPermissions):
+			await ctx.send("I'm missing permissions!")
+			# raise exc  # So we see this in the terminal.
 
 @tasks.loop(minutes=.5)
 async def presence_randomiser():
-    status = ['complaining about katarina items', 'why is sivir -15% damage', 'complaining about aram ziggs',
-    'complaining about twitch ult', 'complaining about camille (sunderer is really bad)', 'going gym', 'watching world cup',
-    'writing the source code', 'failing uni', 'not having internship', 'being doomer', 'retail therapy',
-    'listening to rach (we\'re first name basis)', 'the slow lee sin ward hop']
+    status = ['']
     await bot.change_presence(activity=discord.Game(name = random.choice(status)))
 
 async def load_extensions():
