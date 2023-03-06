@@ -6,7 +6,7 @@ import youtube_dl
 import random
 import DiscordUtils
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils import ytdl_format_options, ffmpeg_options
 from utils import player_delay, delete_command_message, get_song_data, create_song_embed, rand_colour
@@ -51,7 +51,6 @@ class Music(commands.Cog, name = 'music'):
         self.queue = []
 
     @commands.hybrid_command(name = 'join', description = 'Joins your voice channel')
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def join(self, ctx):
         if not ctx.message.author.voice:
             return await ctx.send('You are not connected to a voice channel.', delete_after=10)
@@ -61,35 +60,38 @@ class Music(commands.Cog, name = 'music'):
         if ctx.voice_client is not None:
             return await ctx.voice_client.move_to(channel)
 
+        self.detect_idle.start(ctx)
         await channel.connect()
         await delete_command_message(ctx)
 
     @commands.hybrid_command(name = 'play', description = 'Plays/searches youtube for a song', aliases = ['p'])
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def play(self, ctx, *, search):
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
+                self.detect_idle.start(ctx)
             else:
                 return await ctx.send('You are not connected to a voice channel.', delete_after=10)
-
-        async with ctx.typing():
-            response = await song_search(search, ctx.message.author, loop=self.bot.loop)
-        song = response['songs'].pop(0)
-        if not ctx.voice_client.is_playing():
-            player = await YTDLSource.source(song, loop=self.bot.loop)
+        try:
             async with ctx.typing():
-                ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
-                await player_delay(ctx)
-            self.current = song
-            await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
-        else:
-            self.queue.append(song)
-            await ctx.send(embed = create_song_embed(song, '⏳ Queued:'))
-        if response['songs']:
-            for i in response['songs']:
-                self.queue.append(i)
-            await ctx.send(f'Queued {len(response["songs"])} songs from {response["pl_name"]}')
+                response = await song_search(search, ctx.message.author, loop=self.bot.loop)
+            song = response['songs'].pop(0)
+            if not ctx.voice_client.is_playing():
+                player = await YTDLSource.source(song, loop=self.bot.loop)
+                async with ctx.typing():
+                    ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
+                    await player_delay(ctx)
+                self.current = song
+                await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
+            else:
+                self.queue.append(song)
+                await ctx.send(embed = create_song_embed(song, '⏳ Queued:'))
+            if response['songs']:
+                for i in response['songs']:
+                    self.queue.append(i)
+                await ctx.send(f'Queued {len(response["songs"])} songs from {response["pl_name"]}')
+        except Exception as e:
+            await ctx.send(f'Try again. Error occured {e}', delete_after=10)
 
         await delete_command_message(ctx)
 
@@ -103,7 +105,6 @@ class Music(commands.Cog, name = 'music'):
 
 
     @commands.hybrid_command(name = 'queue', description = 'Displays the next 10 songs in queue', aliases = ['q'])
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def queue(self, ctx):
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             self.current = None
@@ -147,7 +148,6 @@ class Music(commands.Cog, name = 'music'):
         return embed
 
     @commands.hybrid_command(name = 'skip', description = 'Skip the current song', aliases = ['s'])
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def skip(self, ctx):
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             return await ctx.send('I am not playing anything.', delete_after=10)
@@ -161,7 +161,6 @@ class Music(commands.Cog, name = 'music'):
             await ctx.send(embed = create_song_embed(skipped, '⌛ Skipped:'))
     
     @commands.hybrid_command(name = 'shuffle', description = 'Shuffle the queue')
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def shuffle(self, ctx):
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             return await ctx.send('I am not playing anything.', delete_after=10)
@@ -172,7 +171,6 @@ class Music(commands.Cog, name = 'music'):
             await ctx.send('Shuffled queue')
 
     @commands.hybrid_command(name = 'pause', description = '(Un)pauses current music')
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def pause(self, ctx):
         if not ctx.voice_client:
             return await ctx.send('I am not currently playing anything.', delete_after=10)
@@ -185,7 +183,6 @@ class Music(commands.Cog, name = 'music'):
         return await ctx.send('Error in pause: unhandled case')
 
     @commands.hybrid_command(name = 'volume', description = 'Change the global volume of music')
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def volume(self, ctx, volume=None):
         if not volume:
             await ctx.send(f'Current volume is {int(ctx.voice_client.source.volume * 100)}%')
@@ -196,7 +193,6 @@ class Music(commands.Cog, name = 'music'):
         await ctx.send(f'`{ctx.author}` changed volume to {volume}%')
 
     @commands.hybrid_command(name = 'leave', description = 'Leave, also clears queue', aliases = ['l', 'stop'])
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def leave(self, ctx):
         if ctx.voice_client:
             self.queue = []
@@ -206,7 +202,6 @@ class Music(commands.Cog, name = 'music'):
             await ctx.send('Not in a vc', delete_after=3)
 
     @commands.hybrid_command(name = 'clear', description = 'Clear the queue')
-    @app_commands.guilds(discord.Object(id = int(os.getenv('MAIN_SERVER'))))
     async def clear(self, ctx):
         if ctx.voice_client:
             ctx.voice_client.stop()
@@ -219,6 +214,22 @@ class Music(commands.Cog, name = 'music'):
         for song in self.queue:
             duration += song['duration']
         return f'{int(duration / 60)} minutes {int(duration % 60)} seconds'
+
+    @tasks.loop(minutes=1)
+    async def detect_idle(self, ctx):
+        voice = ctx.voice_client
+        if voice and not voice.is_playing() and len(self.queue) == 0:
+            idle_time = 0
+            while True:
+                print(f"count {idle_time}")
+                await asyncio.sleep(1)
+                idle_time = idle_time + 1
+                if idle_time == 120:
+                    await ctx.send("Leaving voice due to inactivity")
+                    await voice.disconnect()
+                    break
+                if voice.is_playing():
+                    break
 
 async def song_search(url, requester, *, loop=None):
     loop = loop or asyncio.get_event_loop()
