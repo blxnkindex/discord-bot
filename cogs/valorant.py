@@ -20,7 +20,7 @@ class Valorant(commands.Cog, name = 'valorant'):
         if len(players) % 2 != 0:
             await ctx.send('Need even number of players for balanced teams')
             return
-        mapname = random.choice(["Ascent", "Bind", "Breeze", "Fracture", "Haven", "Icebox", "Pearl", "Split"])
+        mapname = random.choice(["Ascent", "Bind", "Breeze", "Fracture", "Haven", "Icebox", "Pearl", "Split", "Lotus"])
         embed = discord.Embed(
             title='Teams', 
             description=f'Map: {mapname}',

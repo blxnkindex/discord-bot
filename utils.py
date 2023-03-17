@@ -139,6 +139,8 @@ def get_map_image(mapname):
         return 'https://static.wikia.nocookie.net/valorant/images/a/af/Loading_Screen_Pearl.png/revision/latest?cb=20220622132842'
     elif mapname == 'Split':
         return 'https://static.wikia.nocookie.net/valorant/images/d/d6/Loading_Screen_Split.png/revision/latest?cb=20200620202349'
+    elif mapname == 'Lotus':
+        return 'https://static.wikia.nocookie.net/valorant/images/d/d0/Loading_Screen_Lotus.png/revision/latest?cb=20230106163526'
 
 def process_team(team, rounds):
     players = []

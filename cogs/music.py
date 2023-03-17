@@ -197,6 +197,7 @@ class Music(commands.Cog, name = 'music'):
         if ctx.voice_client:
             self.queue = []
             await ctx.send('Left the voice channel, queue is cleared', delete_after=10)
+            self.detect_idle.cancel()
             await ctx.voice_client.disconnect()
         else:
             await ctx.send('Not in a vc', delete_after=3)
@@ -221,15 +222,16 @@ class Music(commands.Cog, name = 'music'):
         if voice and not voice.is_playing() and len(self.queue) == 0:
             idle_time = 0
             while True:
-                print(f"count {idle_time}")
                 await asyncio.sleep(1)
                 idle_time = idle_time + 1
-                if idle_time == 120:
+                if idle_time == 300:
                     await ctx.send("Leaving voice due to inactivity")
                     await voice.disconnect()
+                    self.detect_idle.cancel()
                     break
-                if voice.is_playing():
+                if voice.is_playing() or voice.is_paused():
                     break
+
 
 async def song_search(url, requester, *, loop=None):
     loop = loop or asyncio.get_event_loop()
