@@ -68,21 +68,29 @@ class Valorant(commands.Cog, name = 'valorant'):
             return await ctx.send('Invalid account (name#id, surround with "" if you have spaces in name) or region (na, eu, ap, kr)', delete_after=15)
         name = riotid.split('#')[0]
         tag = riotid.split('#')[1]
-        async with ctx.typing():
-            response = requests.get(f'https://api.henrikdev.xyz/valorant/v3/matches/{region}/{name}/{tag}?filter=competitive')
-        if response.status_code == 200:
-            info = json.loads(json.dumps(response.json(), indent=4))
-            paginator = DiscordUtils.Pagination.CustomEmbedPaginator(ctx)
-            paginator.add_reaction('⏪', "back")
-            paginator.add_reaction('⏩', "next")
-            embeds = []
-            game_number = 1
-            for game in info['data']:
-                embeds.append(create_scoreboard_embed(game, name, tag, game_number))
-                game_number += 1
-            await paginator.run(embeds)
-        else:
-            return await ctx.send(f'API call failed with return code {response.status_code}')
+        try:
+            async with ctx.typing():
+                response = requests.get(f'https://api.henrikdev.xyz/valorant/v3/matches/{region}/{name}/{tag}?filter=competitive')
+            if response.status_code == 200:
+                info = json.loads(json.dumps(response.json(), indent=4))
+                if not info['data']:
+                    return await ctx.send(f'API returned no games...')
+                paginator = DiscordUtils.Pagination.CustomEmbedPaginator(ctx)
+                paginator.add_reaction('⏪', "back")
+                paginator.add_reaction('⏩', "next")
+                embeds = []
+                game_number = 1
+                for game in info['data']:
+                    embeds.append(create_scoreboard_embed(game, name, tag, game_number))
+                    game_number += 1
+                await paginator.run(embeds)
+            else:
+                return await ctx.send(f'API call failed with return code {response.status_code}')
+            if response.status_code == 429:
+                return await ctx.send(f'Rate limit for API exceeded, wait a few minutes')
+        except Exception as e:
+            return await ctx.send(f'Error occured: {e}')
+
 
     @commands.hybrid_command(name = 'valtop', description = 'Gets server (default APAC) top 10 radiant leaderboard')
     async def valtop(self, ctx, region='ap'):
