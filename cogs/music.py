@@ -49,6 +49,8 @@ class Music(commands.Cog, name = 'music'):
         self.bot = bot
         self.current = None
         self.queue = []
+        self.loop = False
+        self.toLoop = []
 
     @commands.hybrid_command(name = 'join', description = 'Joins your voice channel')
     async def join(self, ctx):
@@ -66,6 +68,9 @@ class Music(commands.Cog, name = 'music'):
 
     @commands.hybrid_command(name = 'play', description = 'Plays/searches youtube for a song', aliases = ['p'])
     async def play(self, ctx, *, search):
+        # check loop
+        if not self.loop:
+            self.toLoop = []
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
@@ -85,6 +90,8 @@ class Music(commands.Cog, name = 'music'):
                 await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
             else:
                 self.queue.append(song)
+                if self.loop:
+                    self.toLoop.append(song)
                 await ctx.send(embed = create_song_embed(song, '⏳ Queued:'))
             if response['songs']:
                 for i in response['songs']:
@@ -96,6 +103,8 @@ class Music(commands.Cog, name = 'music'):
         await delete_command_message(ctx)
 
     async def play_next(self, ctx):
+        if self.loop and len(self.queue) == 0:
+            self.queue = self.toLoop.copy()
         song = self.queue.pop(0)
         player = await YTDLSource.source(song, loop=self.bot.loop)
         self.current = song
@@ -103,9 +112,31 @@ class Music(commands.Cog, name = 'music'):
         await player_delay(ctx)
         await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
 
+    @commands.hybrid_command(name = 'loop', description = 'Requeues a song whenever its done playing')
+    async def loop(self, ctx, loop=None):
+        if not loop:
+            if self.loop:
+                return await ctx.send('Currently looping')
+            else:
+                return await ctx.send('Currently not looping')
+        if loop == 'on':
+            self.loop = True
+            self.toLoop = self.queue.copy()
+            self.toLoop.append(self.current)
+            return await ctx.send('Now looping. All existing songs will be looped, turn loop off to clear looping songs')
+
+        elif loop == 'off':
+            self.loop = False
+            self.toLoop = []
+            return await ctx.send('Stopped looping.')
+        else:
+            return await ctx.send('Usage >loop on or >loop off.', delete_after=10)
+
 
     @commands.hybrid_command(name = 'queue', description = 'Displays the next 10 songs in queue', aliases = ['q'])
     async def queue(self, ctx):
+        print(self.queue)
+        print(self.toLoop)
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             self.current = None
         if self.current:
@@ -158,7 +189,7 @@ class Music(commands.Cog, name = 'music'):
         else:
             ctx.voice_client.stop()
         if skipped:
-            await ctx.send(embed = create_song_embed(skipped, '⌛ Skipped:'))
+            await ctx.send(embed = create_song_embed(skipped, '⏩ Skipped:'))
     
     @commands.hybrid_command(name = 'shuffle', description = 'Shuffle the queue')
     async def shuffle(self, ctx):
@@ -198,6 +229,7 @@ class Music(commands.Cog, name = 'music'):
             self.queue = []
             await ctx.send('Left the voice channel, queue is cleared', delete_after=10)
             self.detect_idle.cancel()
+            self.loop = False
             await ctx.voice_client.disconnect()
         else:
             await ctx.send('Not in a vc', delete_after=3)
@@ -206,6 +238,7 @@ class Music(commands.Cog, name = 'music'):
     async def clear(self, ctx):
         if ctx.voice_client:
             ctx.voice_client.stop()
+            self.loop = False
             self.current = None
             self.queue = []
             await ctx.send('Queue is cleared.', delete_after=10)
