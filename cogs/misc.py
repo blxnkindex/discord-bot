@@ -28,8 +28,7 @@ class Misc(commands.Cog, name = 'misc'):
         except:
             await ctx.send('Usage: >clean [int]', delete_after=10)
         else:
-            num = min(num, 20)
-            await ctx.channel.purge(limit=num)
+            await ctx.channel.purge(limit=min(num, 20))
 
     @commands.command(name = ':)', hidden=True)
     async def smile(self, ctx: Context):
