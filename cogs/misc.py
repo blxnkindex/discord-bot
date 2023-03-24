@@ -19,6 +19,18 @@ class Misc(commands.Cog, name = 'misc'):
         embed.set_image(url=f'attachment://{result}.png')
         await ctx.send(file=file, embed=embed)
 
+
+    @commands.hybrid_command(name = 'clean', description = 'Deletes a given number of messages (up to 20 at a time)', aliases = ['purge'])
+    @commands.has_permissions(manage_messages=True)
+    async def clean(self, ctx: Context, num=20):
+        try:
+            int(num)
+        except:
+            await ctx.send('Usage: >clean [int]', delete_after=10)
+        else:
+            num = min(num, 20)
+            await ctx.channel.purge(limit=num)
+
     @commands.command(name = ':)', hidden=True)
     async def smile(self, ctx: Context):
         embed = discord.Embed(title='>:)', colour=rand_colour())
