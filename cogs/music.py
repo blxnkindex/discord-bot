@@ -76,7 +76,7 @@ class Music(commands.Cog, name = 'music'):
                 await ctx.author.voice.channel.connect()
                 self.detect_idle.start(ctx)
             else:
-                return await ctx.send('You are not connected to a voice channel.', delete_after=10)
+                return await ctx.send(':x: You are not connected to a voice channel.', delete_after=10)
         try:
             async with ctx.typing():
                 response = await song_search(search, ctx.message.author, loop=self.bot.loop)
@@ -110,7 +110,8 @@ class Music(commands.Cog, name = 'music'):
         self.current = song
         ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop))
         await player_delay(ctx)
-        await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
+        if not self.loop:
+            await ctx.send(embed = create_song_embed(song, '🎵  Now Playing:'))
 
     @commands.hybrid_command(name = 'loop', description = 'Requeues a song whenever its done playing')
     async def loop(self, ctx, loop=None):
@@ -123,7 +124,7 @@ class Music(commands.Cog, name = 'music'):
             self.loop = True
             self.toLoop = self.queue.copy()
             self.toLoop.append(self.current)
-            return await ctx.send('Now looping. All existing songs will be looped, turn loop off to clear looping songs')
+            return await ctx.send('Now looping. All existing songs will be looped. Music output is suppressed.')
 
         elif loop == 'off':
             self.loop = False
@@ -135,8 +136,6 @@ class Music(commands.Cog, name = 'music'):
 
     @commands.hybrid_command(name = 'queue', description = 'Displays the next 10 songs in queue', aliases = ['q'])
     async def queue(self, ctx):
-        print(self.queue)
-        print(self.toLoop)
         if not ctx.voice_client or not ctx.voice_client.is_playing():
             self.current = None
         if self.current:
@@ -237,9 +236,7 @@ class Music(commands.Cog, name = 'music'):
     @commands.hybrid_command(name = 'clear', description = 'Clear the queue')
     async def clear(self, ctx):
         if ctx.voice_client:
-            ctx.voice_client.stop()
             self.loop = False
-            self.current = None
             self.queue = []
             await ctx.send('Queue is cleared.', delete_after=10)
 
