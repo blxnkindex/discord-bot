@@ -2,6 +2,8 @@ import random
 from discord import Colour
 import discord
 import asyncio
+import requests
+import json
 
 '''
 Generates a random Colour
@@ -187,3 +189,105 @@ def make_leaderboard_embed(info, index):
     players = '\n'.join(players)
     embed.add_field(name=f'Rank {index - 8} to {index + 1}',value=f'```{players}```', inline=False)
     return embed
+
+def calcVariance(region, name, tag):
+    response = requests.get(f'https://api.henrikdev.xyz/valorant/v1/mmr-history/{region}/{name}/{tag}')
+    if response.status_code == 200:
+        info = json.loads(json.dumps(response.json(), indent=4))
+        wins = []
+        losses = []
+        for game in info['data']:
+            if game['mmr_change_to_last_game'] > 0:
+                wins.append(game['mmr_change_to_last_game'])
+            elif game['mmr_change_to_last_game'] < 0:
+                losses.append(game['mmr_change_to_last_game'])
+        if len(losses) != 0:
+            winsAvg = sum(wins)/len(wins)
+            lossAvg = sum(losses)/len(losses)
+            return round(winsAvg + lossAvg, 2)
+        else:
+            return round(sum(wins)/len(wins),2)
+
+def createMmrEmbed(hiddenElo, rawElo, variance, name):
+    eloGap = hiddenElo - rawElo
+    if variance > 0 and eloGap < 0:
+        desc1 = f'Your actual elo is `{rawElo}`, the mmr of your games are `{hiddenElo}`, with a disparity of `{eloGap}`'
+        color = Colour.from_rgb(0,255,0)
+        if variance > 10:
+            desc2 =  f'Your hidden mmr is very good, with a variance of `{variance}`. You are likely the highest rank on your teams and just not at the rank you used to be, but your mmr is.'
+        elif variance > 2 and variance < 10:
+            color = Colour.from_rgb(0,255,0)
+            desc2 = f'You are getting above average gains and losses (Variance of `{variance}`). You are likely the highest rank on your teams and just not at the rank you used to be, but your mmr is.'
+        elif variance < 2:
+            color = Colour.from_rgb(255,255,0)
+            desc2 = f'You are getting similar gains and losses (Variance of `{variance}`). You are likely the highest rank on your teams and just not at the rank you used to be, but your mmr is.'
+    elif eloGap < 0:
+        color = Colour.from_rgb(255,0,0)
+        desc1 = f'Your average game mmr is `{eloGap}`' + f' compared to your actual elo \n\n(Actual elo `{rawElo}`, Avg Game MMR: `{hiddenElo}`).'
+        if variance > 10:
+            desc2 =  f'Your hidden mmr is extremely good, with a variance of `{variance}`. You are likely the highest rank on your teams and just not at the rank you used to be, but your mmr is.'
+        elif variance > -1 and variance < 2:
+            color = Colour.from_rgb(255,255,0)
+            desc2 = f'You are getting similar gains and losses (Variance of `{variance}`)'
+        elif variance > 2 and variance < 10:
+            color = Colour.from_rgb(0,255,0)
+            desc2 = f'You are getting above average gains and losses (Variance of `{variance}`)'
+        elif variance < -1:
+            color = Colour.from_rgb(255,0,0)
+            desc2 = f'You are getting below average gains and losses (Variance of `{variance}`)'
+    elif eloGap > 0:
+        color = Colour.from_rgb(0,255,0)
+        desc1 = f'Your average game mmr is `{eloGap}`' + f' above your actual elo \n\n(Actual elo `{rawElo}`, Avg Game MMR: `{hiddenElo}`)'           
+        if variance > 10:
+            desc2 =  f'Your hidden mmr is extremely good, with a variance of `{variance}`. You are likely the highest rank on your teams and just not at the rank you used to be, but your mmr is.'
+        elif variance > -1 and variance < 2:
+            color = Colour.from_rgb(255,255,0)
+            desc2 = f'You are getting similar gains and losses (Variance of `{variance}`)'
+        elif variance > 2 and variance < 10:
+            color = Colour.from_rgb(0,255,0)
+            desc2 = f'You are getting above average gains and losses (Variance of `{variance}`)'
+        elif variance < -1:
+            color = Colour.from_rgb(255,0,0)
+            desc2 = f'You are getting below average gains and losses (Variance of `{variance}`)'
+
+    embed = discord.Embed(title=f'MMR Report for {name}', description=desc1 +'\n\n' + desc2, color=color)
+    embed.set_footer(text=f'Estimate of your mmr strength (duo can affect this). Variance is how much you gain over a loss')
+    return embed
+
+def parseElo(rank):
+        variance = random.randint(-49,49)
+        if 'Iron' in rank:
+            elo = 50
+            elo += (int(rank.split(' ')[1]) - 1) * 100
+        elif 'Bronze' in rank:
+            elo = 350
+            elo += (int(rank.split(' ')[1]) - 1) * 100
+        elif 'Silver' in rank:
+            elo = 650
+            elo += (int(rank.split(' ')[1]) - 1) * 100
+        elif 'Gold' in rank:
+            elo = 950
+            elo += (int(rank.split(' ')[1]) - 1) * 100
+        elif 'Platinum' in rank:
+            elo = 1250
+            elo += (int(rank.split(' ')[1]) - 1) * 100
+        elif 'Diamond' in rank:
+            elo = 1550
+            elo += (int(rank.split(' ')[1]) - 1) * 100
+        elif 'Ascendant' in rank:
+            elo = 1850
+            elo += (int(rank.split(' ')[1]) - 1) * 100
+        elif 'Immortal 1' in rank:
+            elo = 2140
+        elif 'Immortal 2' in rank:
+            elo = 2240
+        elif 'Immortal 3' in rank:
+            elo = 2400
+            variance = random.randint(-80,80)
+        elif 'Radiant' in rank:
+            elo = 2700
+            variance = random.randint(-200,200)
+        else:
+            return -1
+        return elo + variance
+    
