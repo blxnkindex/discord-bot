@@ -1,11 +1,9 @@
 import asyncio
-import os
 
 import discord
 import youtube_dl
 import random
 import DiscordUtils
-from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import ytdl_format_options, ffmpeg_options
