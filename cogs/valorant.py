@@ -4,9 +4,8 @@ import requests
 import json
 import DiscordUtils
 import random
-import datetime
 
-from utils import rank_color, create_scoreboard_embed, get_map_image, make_leaderboard_embed, parseElo, createMmrEmbed, calcVariance
+from utils import rank_color, create_scoreboard_embed, get_map_image, make_leaderboard_embed, parseElo, createMmrEmbed, calcVariance, makeQuickHistoryEmbed
 
 class Valorant(commands.Cog, name = 'valorant'):
     def __init__(self, bot):
@@ -110,8 +109,8 @@ class Valorant(commands.Cog, name = 'valorant'):
         else:
             return await ctx.send('Failed to find leaderboard. :(', delete_after=15)
         
-    @commands.hybrid_command(name = 'valquickhistory', description = 'Gets quick elo history of account')
-    async def valquickhistory(self, ctx, riotid, region='ap'):
+    @commands.hybrid_command(name = 'valelohistory', description = 'Gets quick elo history of account')
+    async def valelohistory(self, ctx, riotid, region='ap'):
         if region not in ['na', 'eu', 'ap', 'kr']:
             return await ctx.send('Invalid region (na, eu, ap, kr)', delete_after=15)
         name = riotid.split('#')[0]
@@ -123,7 +122,7 @@ class Valorant(commands.Cog, name = 'valorant'):
                 info = json.loads(json.dumps(response.json(), indent=4))
                 embeds = []
                 for i in range(0,len(info['data']),5):
-                    embeds.append(self.makeQuickHistoryEmbed(info, i))
+                    embeds.append(makeQuickHistoryEmbed(info, i))
                 if len(embeds) == 1:
                     await ctx.send(embed = embeds.pop(0))
                 elif len(embeds) > 1:
@@ -135,18 +134,6 @@ class Valorant(commands.Cog, name = 'valorant'):
                 return await ctx.send('Failed to find leaderboard. :(', delete_after=15)
         except Exception as e:
             return await ctx.send(f'Error occured {e}')
-
-    def makeQuickHistoryEmbed(self, info, start):
-        color = rank_color(info["data"][start]["currenttierpatched"].replace(" ", ""))
-        embed = discord.Embed(title=f'{info["name"]}#{info["tag"]}', color=color)
-        for i in range(start, min(start + 5, len(info['data']))):
-            game = info['data'][i]
-            timePlayed = datetime.datetime.fromtimestamp(game['date_raw'])
-
-            rankString = str(game['currenttierpatched']) + ' ' + str(int(game['ranking_in_tier']) - int(game['mmr_change_to_last_game']))+'rr' + ' --> ' + str(game['ranking_in_tier']) + 'rr' + ' Net elo: ' + str(game['mmr_change_to_last_game'])
-            embed.add_field(name=timePlayed.strftime("%A, %B %d, %H:%M"), value=f'```{rankString}```', inline=False)
-            
-        return embed
 
     @commands.hybrid_command(name = 'valmmr', description = 'Calculates an estimation of your hidden elo')
     async def valmmr(self, ctx, riotid, region='ap'):
@@ -173,6 +160,18 @@ class Valorant(commands.Cog, name = 'valorant'):
                     return await ctx.send(embed=createMmrEmbed(hiddenElo, rawElo, variance, name + '#' + tag))
         except Exception as e:
             return await ctx.send(f'Error occured {e}')
+        
+    @commands.hybrid_command(name = 'valmmrhelp', description = 'Explains valmmr output')
+    async def valmmrhelp(self, ctx):
+        embed = discord.Embed(title='Val MMR Help 💬', color=0xffdcf4)
+        embed.add_field(name='MMR Report Colors', value=f'```Red - Low Avg MMR / Variance | Yellow - Average MMR / Variance | Green - Above Avg MMR / Variance | Cyan - Very Good MMR / Variance```', inline=False)
+        embed.add_field(name='How it works?', value=f'```The command gathers the last 50 people in your games, (5 games x 10 players), averages their ranks with some slight added randomness and compares it to your rank.```', inline=False)
+        embed.add_field(name='What do the elo numbers mean?', value=f'```Average Game MMR is the average elo of your teammates and enemies. Actual elo is your visible rank converted to elo (NOT your hidden mmr).```', inline=False)
+        embed.add_field(name='What is variance?', value=f'```Variance is the elo you would gain or lose if you won one game then lost one game (on average).```', inline=False)
+        embed.add_field(name='Bad MMR despite winning?', value=f'```If you have yellow/red, you are either placed into lower games because you are losing. Or you could be at a new recent \'peak\' where rr AND mmr gains slow down (you start \
+                        getting teammates below your rank more often). Radiant players will also usually show red mmr, this is because there are not enough radiants to be in your games, so you end up with immortals.```', inline=False)
+        return await ctx.send(embed=embed)
+
 
 async def setup(bot):
     await bot.add_cog(Valorant(bot))
