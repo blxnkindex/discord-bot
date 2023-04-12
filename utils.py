@@ -170,16 +170,28 @@ def process_team(team, rounds):
         p['kda'] = kda
         p['hs'] = str(round(hs*100))
         p['acs'] = round(player['stats']['score'] / rounds)
+        if player['currenttier_patched'][0] == 'U':
+            p['currenttier_patched'] = 'None'
+        elif player['currenttier_patched'][0] == 'R':
+            p['currenttier_patched'] = player['currenttier_patched'][0] + player['currenttier_patched'][1] + player['currenttier_patched'][2]
+        else:
+            p['currenttier_patched'] = player['currenttier_patched'][0] + player['currenttier_patched'][1] + player['currenttier_patched'][2] + ' ' + player['currenttier_patched'][-1]
+
         players.append(p)
     players = sorted(players, key=lambda p: p['acs'], reverse=True) 
     scoreboard = []
     for p in players:
         gap = '                 '
-        gap2 = '         '
-        offset1 = len(p['name'])
+        gap2 = '        '
+        gap3 = '   ' if (len(p['hs']) == 1) else '  '
+        gap4 = '   '
+        offset1 = 0
+        for c in range(0,len(p['name'])):
+            offset1 += 1 if p['name'][c].isascii() else 2
+        offset1 = min(offset1, 16)
         offset2 = len(p['kda'])
-        offset3 = len(p['hs']) + 5
-        scoreboard.append(f'{p["name"]}{gap[offset1:]}{p["kda"]}{gap2[offset2:]}HS: {p["hs"]}%{gap2[offset3:]}ACS: {p["acs"]}')
+        offset3 = len(str(p['acs']))
+        scoreboard.append(f'{p["name"]}{gap[offset1:]}{p["kda"]}{gap2[offset2:]} {p["hs"]}%{gap3}{p["acs"]}{gap4[offset3:]}  {p["currenttier_patched"]}')
     return scoreboard
 
 def make_leaderboard_embed(info, index):
@@ -214,21 +226,25 @@ def calcVariance(region, name, tag):
                 wins.append(game['mmr_change_to_last_game'])
             elif game['mmr_change_to_last_game'] < 0:
                 losses.append(game['mmr_change_to_last_game'])
-        if len(losses) != 0:
-            winsAvg = sum(wins)/len(wins)
-            lossAvg = sum(losses)/len(losses)
-            return round(winsAvg + lossAvg, 2)
-        else:
-            return round(sum(wins)/len(wins),2)
+        if len(wins) == 0 and len(losses) == 0:
+            return 0
+        avgWin = 0 if (len(wins) == 0) else sum(wins)/len(wins)
+        avgLoss = 1 if (len(losses) == 0) else sum(losses)/len(losses)
+        return round((avgWin + avgLoss),2)
 
 def createMmrEmbed(hiddenElo, rawElo, variance, name):
     eloGap = hiddenElo - rawElo
-    if eloGap < 0:
+    if eloGap > -50 and eloGap < 50:
+        desc1 = f'Your average game mmr is close to your actual elo, difference of `{eloGap}`. \n\n(Actual elo `{rawElo}`, Avg Game MMR: `{hiddenElo}`).'
+    elif eloGap < 0:
         desc1 = f'Your average game mmr is `{eloGap}`' + f' compared to your actual elo \n\n(Actual elo `{rawElo}`, Avg Game MMR: `{hiddenElo}`).'
     elif eloGap > 0:
         desc1 = f'Your average game mmr is `{eloGap}`' + f' above your actual elo \n\n(Actual elo `{rawElo}`, Avg Game MMR: `{hiddenElo}`)'
     color = getMmrEmbedDetails(variance)[1]
     desc2 = getMmrEmbedDetails(variance)[0]
+    if eloGap > 100 and variance > 1:
+        color = Colour.from_rgb(0,255,255)
+
 
     embed = discord.Embed(title=f'MMR Report for {name}', description=desc1 +'\n\n' + desc2, color=color)
     embed.set_footer(text=f'Use command \'>valmmrhelp\' for more info.')
@@ -238,13 +254,16 @@ def getMmrEmbedDetails(variance):
     if variance > 10:
         color = Colour.from_rgb(0,255,255)
         desc2 =  f'Your hidden mmr is very good, with a variance of `{variance}`. \nYou are likely the highest rank on your teams/games and either not at your old rank or at a recent peak.'
-    elif variance > -1 and variance < 1:
-        color = Colour.from_rgb(255,255,0)
-        desc2 = f'You are getting similar gains and losses (Variance of `{variance}`)'
-    elif variance > 1 and variance < 10:
+    elif variance > 5 and variance <= 10:
+        color = Colour.from_rgb(0,255,0)
+        desc2 =  f'You have strong variance of `{variance}`, maintaining this mmr will result in positive climb. \nYou have good mmr and likely expected (by the game) to win most your games.'
+    elif variance > 1 and variance <= 5:
         color = Colour.from_rgb(0,255,0)
         desc2 = f'You are getting above average gains and losses (Variance of `{variance}`)'
-    elif variance < -1:
+    elif variance > -1 and variance <= 1:
+        color = Colour.from_rgb(255,255,0)
+        desc2 = f'You are getting similar gains and losses (Variance of `{variance}`)'
+    elif variance <= -1:
         color = Colour.from_rgb(255,0,0)
         desc2 = f'You are getting below average gains and losses (Variance of `{variance}`)'
     return (desc2, color)
@@ -277,11 +296,11 @@ def parseElo(rank):
         elif 'Immortal 2' in rank:
             elo = 2240
         elif 'Immortal 3' in rank:
-            elo = 2400
-            variance = random.randint(-80,80)
+            elo = 2450
+            variance = random.randint(-40,80)
         elif 'Radiant' in rank:
-            elo = 2700
-            variance = random.randint(-200,200)
+            elo = 2750
+            variance = random.randint(-100,200)
         else:
             return -1
         return elo + variance

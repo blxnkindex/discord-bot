@@ -168,7 +168,7 @@ class Valorant(commands.Cog, name = 'valorant'):
         embed.add_field(name='How it works?', value=f'```The command gathers the last 50 people in your games, (5 games x 10 players), averages their ranks with some slight added randomness and compares it to your rank.```', inline=False)
         embed.add_field(name='What do the elo numbers mean?', value=f'```Average Game MMR is the average elo of your teammates and enemies. Actual elo is your visible rank converted to elo (NOT your hidden mmr).```', inline=False)
         embed.add_field(name='What is variance?', value=f'```Variance is the elo you would gain or lose if you won one game then lost one game (on average).```', inline=False)
-        embed.add_field(name='Bad MMR despite winning?', value=f'```If you have yellow/red, you are either placed into lower games because you are losing. Or you could be at a new recent \'peak\' where rr AND mmr gains slow down (you start \
+        embed.add_field(name='Bad MMR despite winning/high rank?', value=f'```If you have yellow/red, you are either placed into lower games because you are losing. Or you could be at a new recent \'peak\' where rr AND mmr gains slow down (you start \
                         getting teammates below your rank more often). Radiant players will also usually show red mmr, this is because there are not enough radiants to be in your games, so you end up with immortals.```', inline=False)
         return await ctx.send(embed=embed)
 
