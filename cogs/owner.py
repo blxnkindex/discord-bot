@@ -14,7 +14,7 @@ class Owner(commands.Cog, name = 'owner'):
             await ctx.send(e)
         else:
             await ctx.send(f'Extension {cog} successfully restarted', delete_after=5)
-            await ctx.message.delete()
+            # await ctx.message.delete()
             print(f'Extension {cog} reloaded')
 
     @commands.command(name='load', hidden=True)
@@ -26,7 +26,7 @@ class Owner(commands.Cog, name = 'owner'):
             await ctx.send(e)
         else:
             await ctx.send(f'Extension {cog} loaded', delete_after=5)
-            await ctx.message.delete()
+            # await ctx.message.delete()
             print(f'Extension {cog} loaded')
 
     @commands.command(name='unload', hidden=True)
@@ -38,7 +38,7 @@ class Owner(commands.Cog, name = 'owner'):
             await ctx.send(e)
         else:
             await ctx.send(f'Extension {cog} loaded', delete_after=5)
-            await ctx.message.delete()
+            # await ctx.message.delete()
             print(f'Extension {cog} unloaded')
 
     @commands.command(name='botleave', hidden=True)

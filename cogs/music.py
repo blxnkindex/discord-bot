@@ -267,7 +267,6 @@ async def song_search(url, requester, *, loop=None):
     
     response = {}
     response['songs'] = []
-    
     if 'entries' in data:
         for i in range(0, len(data['entries'])):
             info = data['entries'][i]
