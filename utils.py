@@ -5,6 +5,8 @@ import asyncio
 import requests
 import json
 import datetime
+import numpy
+import os
 
 '''
 Generates a random Colour
@@ -305,3 +307,122 @@ def parseElo(rank):
             return -1
         return elo + variance
     
+'''
+Casino Utils
+'''
+
+def resetDeck():
+    return ['2_clu', '2_dia', '2_hea', '2_spa', '3_clu', '3_dia', '3_hea', '3_spa', '4_clu', '4_dia', '4_hea', '4_spa', '5_clu', '5_dia', '5_hea', '5_spa', '6_clu', '6_dia', '6_hea', '6_spa', '7_clu', '7_dia', '7_hea', '7_spa', '8_clu', '8_dia', '8_hea', '8_spa', '9_clu', '9_dia', '9_hea', '9_spa', '10_clu', '10_dia', '10_hea', '10_spa','J_clu', 'J_dia', 'J_hea', 'J_spa', 'Q_clu', 'Q_dia', 'Q_hea', 'Q_spa', 'K_clu', 'K_dia', 'K_hea', 'K_spa','A_clu', 'A_dia', 'A_hea', 'A_spa']
+
+def parseCards(card):
+    if card == 'hidden':
+        return 'Hidden Card'
+    num = card.split('_')[0]
+    suit = card.split('_')[1]
+    s = ''
+    if num == 'A':
+        s += 'Ace'
+    elif num == 'K':
+        s += 'King'
+    elif num == 'Q':
+        s += 'Queen'
+    elif num == 'J':
+        s += 'Jack'
+    else:
+        s += num
+    s += ' of '
+    if suit == 'clu':
+        s += 'Clubs'
+    elif suit == 'dia':
+        s += 'Diamonds'
+    elif suit == 'hea':
+        s += 'Hearts'
+    elif suit == 'spa':
+        s += 'Spades'
+    return s
+
+def getPlayerBalance(uid):
+    with open(os.getenv('PLAYER_BAL'), "r") as f:
+        balances =  json.load(f)
+    if uid == 'casino':
+        return balances['casino']
+    if str(uid) in balances and balances[str(uid)] >= 0:
+        return balances[str(uid)]
+    elif str(uid) in balances and balances[str(uid)] <= 0:
+        return -1
+    elif not str(uid) in balances:
+        return -21
+    return False
+
+def updatePlayerBalance(uid, newBal):
+    with open(os.getenv('PLAYER_BAL'), "r") as f:
+        balances =  json.load(f)
+    balances[str(uid)] = newBal 
+    with open(os.getenv('PLAYER_BAL'), "w") as f:
+        json.dump(balances, f)
+    print(f'updated {uid} to {newBal}')
+
+async def ensureAmount(ctx, amount):
+    balance = getPlayerBalance(ctx.message.author.id)
+    print(balance)
+    if balance == 0:
+        await ctx.send(f'You have no dollars left brokie')
+        return False
+    if balance == -21:
+        await ctx.send(f'`{ctx.message.author}` is new to the casino, they are given 5000 dollars starting balance.')
+        balance = 5000
+        updatePlayerBalance(ctx.message.author.id, 5000)
+    if (balance - amount) < 0:
+        await ctx.send(f'You have {balance}, not enough to use {amount}')
+        return False
+    return balance
+
+async def ensureRouletteInput(ctx, bet, amount):
+    if not bet or not amount:
+        await ctx.send('Usage: >roulette red/black/green/high/low/[0-15] betAmount')
+        return False
+    if amount.isdigit():
+        amount = int(amount)
+    if bet.isdigit():
+        bet = int(bet)
+    if type(amount) != int:
+        await ctx.send('Bet amount needs to be a whole number')
+        return False
+    if type(bet) == str :
+        if bet not in ['red', 'black', 'green', 'high', 'low']:
+            await ctx.send('Bet type can be red, black, green, high (8-14), low (1-7) or a specific number 0-14')
+            return False
+    elif type(bet) == int and bet < 0 or bet > 14:
+        await ctx.send('Bet type can be red, black, green, high (8-14), low (1-7) or a specific number 0-14')
+        return False
+    return True
+
+async def rollRoulette(ctx):
+    r = ':red_square:'
+    b = ':black_large_square:'
+    g = ':green_square:'
+    w = ':white_large_square:'
+    table = [g,b,r,b,r,b,r,b,r,b,r,b,r,b,r]
+    table = numpy.roll(table, random.randint(0, 14))
+
+    msg = await ctx.send(f'Rolling...')
+    rollTime = 0
+    maxRollTime = random.uniform(2.5, 4.5)
+    increment = 0.5
+    while rollTime < maxRollTime:
+        table = numpy.roll(table, 1)
+        await msg.edit(content=f'Rolling... {int(maxRollTime - rollTime)}\r\n{w}{w}{w}{w}{w}:arrow_down_small:{w}{w}{w}{w}{w}\
+                    \r\n{w}{table[0]}{table[1]}{table[2]}{table[3]}{table[4]}{table[5]}{table[6]}{table[7]}{table[8]}{w}\
+                    \r\n{w}{w}{w}{w}{w}:arrow_up_small:{w}{w}{w}{w}{w}')
+        await asyncio.sleep(increment)
+        rollTime += increment
+        if rollTime > 1 and rollTime < 2:
+            increment = 0.65
+        elif rollTime > 2:
+            increment = 0.85
+    await asyncio.sleep(random.uniform(0.2, 0.6))
+    table = numpy.roll(table, 1)
+    await msg.edit(content=f'Finished!\r\n{w}{w}{w}{w}{w}:arrow_down_small:{w}{w}{w}{w}{w}\
+                    \r\n{w}{table[0]}{table[1]}{table[2]}{table[3]}{table[4]}{table[5]}{table[6]}{table[7]}{table[8]}{w}\
+                    \r\n{w}{w}{w}{w}{w}:arrow_up_small:{w}{w}{w}{w}{w}')
+    return table
