@@ -354,6 +354,76 @@ def getPlayerBalance(uid):
         return -21
     return False
 
+def getRoulettePayout(color, bet, num, amount):
+    if isinstance(bet, str):
+        if bet == 'green' and bet == color:
+            return True, amount * 14
+        elif bet in ('red', 'black') and bet == color:
+            return True, amount * 2
+        elif bet == 'high' and num >= 8:
+            return True, amount * 2
+        elif bet == 'low' and num < 8:
+            return True, amount * 2
+        else:
+            return False, amount
+    elif isinstance(bet, int):
+        if num == bet:
+            return True, amount * 14
+        else:
+            return False, amount
+    else:
+        return False, amount
+    
+def calcScore(cards):
+    c = []
+    aceNum = 0
+    for card in cards:
+        if card.split('_')[0] == 'A':
+            aceNum += 1
+        c.append(card.split('_')[0])
+    score = 0
+    for card in c:
+        if card.isdigit():
+            score += int(card)
+        elif card == 'K' or card == 'J' or card == 'Q':
+            score += 10
+        elif card == 'A' and score > 10:
+            score += 1
+        elif card == 'A' and score <= 10:
+            score += 11
+    if score > 21 and 'A' in c:
+        if score - 10 <= 21 and aceNum >= 1:
+            return score - 10
+        elif score - 10 > 21 and score - 20 <= 21 and aceNum == 2:
+            return score - 20
+    else:
+        return score
+    
+def bjEmbed(playerCards, dealerCards, player, amount):
+    embed = discord.Embed(
+        title=f'{player}\'s Blackjack Game',
+        description=f'Stakes: {amount}',
+        colour=rand_colour()
+    )
+    playerCards = '\n'.join(list(map(parseCards, playerCards)))
+    dealerCards = '\n'.join(list(map(parseCards, dealerCards)))
+    if playerCards == '':
+        playerCards = ' '
+    if dealerCards == '':
+        dealerCards = ' '
+    
+    embed.add_field(name=f'{player}\'s cards', value=f'```{playerCards} ```', inline=False)
+    embed.add_field(name=f'Dealer\'s cards', value=f'```{dealerCards} ```', inline=False)
+    return embed
+    
+def getPayout(color, bet, num):
+    if type(bet) == str:
+        if (bet == 'green' and bet == color) or ((bet == 'red' or bet == 'black') and bet == color) or (bet == 'high' and num >= 8) or (bet == 'low' and num < 8):
+            return True
+    elif type(bet) == int:
+        if num == bet: return True
+    return False
+
 def updatePlayerBalance(uid, newBal):
     with open(os.getenv('PLAYER_BAL'), "r") as f:
         balances =  json.load(f)
@@ -369,7 +439,7 @@ async def ensureAmount(ctx, amount):
         await ctx.send(f'You have no dollars left brokie')
         return False
     if balance == -21:
-        await ctx.send(f'`{ctx.message.author}` is new to the casino, they are given 5000 dollars starting balance.')
+        await ctx.send(f'`{ctx.message.author.display_name}` is new to the casino, they are given 5000 dollars starting balance.')
         balance = 5000
         updatePlayerBalance(ctx.message.author.id, 5000)
     if (balance - amount) < 0:

@@ -1,7 +1,7 @@
 import asyncio
 
 import discord
-import youtube_dl
+import yt_dlp 
 import random
 import DiscordUtils
 from discord.ext import commands, tasks
@@ -10,9 +10,7 @@ from utils import ytdl_format_options, ffmpeg_options
 from utils import player_delay, delete_command_message, get_song_data, create_song_embed, rand_colour
 
 
-# Suppress noise about console usage from errors
-youtube_dl.utils.bug_reports_message = lambda: ''
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 '''
 Instances created for each requested song
@@ -66,7 +64,6 @@ class Music(commands.Cog, name = 'music'):
 
     @commands.hybrid_command(name = 'play', description = 'Plays/searches youtube for a song', aliases = ['p'])
     async def play(self, ctx, *, search):
-        # check loop
         if not self.loop:
             self.toLoop = []
         if ctx.voice_client is None:

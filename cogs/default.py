@@ -23,10 +23,13 @@ class Default(commands.Cog, name = 'default'):
 
         await ctx.send(embed=embed)
 
-
     @commands.hybrid_command(name = 'info', description = 'Get some info about the server', aliases = ['serverinfo'])
     async def info(self, ctx):
-        embed = discord.Embed(title='Server Info 💬', description=str(ctx.guild.name), colour=rand_colour())
+        embed = discord.Embed(
+            title=f"{ctx.guild.name} Server Info 💬",
+            description=f"Here are the details for **{ctx.guild.name}**!",
+            color=rand_colour()
+        )
         if ctx.guild.icon:
             embed.set_thumbnail(url=ctx.guild.icon.url)
 
@@ -34,7 +37,7 @@ class Default(commands.Cog, name = 'default'):
         embed.add_field(name='Members', value=ctx.guild.member_count)
         embed.add_field(name='Channels', value=f'{len(ctx.guild.channels)}')
         embed.add_field(name='Roles', value=len(ctx.guild.roles))
-        embed.set_footer(text=f'Server Made: {ctx.guild.created_at}')
+        embed.set_footer(text=f"Server Created: {ctx.guild.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name='ping', description='Check bot delay',)
